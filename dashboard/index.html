@@ -80,6 +80,49 @@
   .kpi .delta { font-size: 12px; color: var(--muted); }
   .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
   .card-head h2 { margin: 0; }
+  .filter-layouts { margin-bottom: 8px; }
+  .filter-blurb { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
+  .hist-filters { position: relative; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+  .hist-filters.stack { display: block; }
+  .hist-filters:empty { display: none; margin: 0; }
+  .fchip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 4px 2px 10px;
+           font-size: 12px; font-weight: 600; background: #1b2a44; border: 1px solid var(--accent); }
+  .fchip b { font-weight: 650; }
+  .fchip button { background: transparent; border: 0; color: var(--muted); padding: 0 6px; font-size: 12px; }
+  .fchip button:hover { color: var(--text); border-color: transparent; }
+  .fchip button.widen { color: var(--accent); }
+  .pop-anchor, .query-wrap { position: relative; }
+  .query-wrap { flex: 1; min-width: 220px; max-width: 420px; }
+  .query-wrap input { width: 100%; }
+  .filter-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: 280px; padding: 12px;
+                background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+                box-shadow: 0 16px 40px rgba(0,0,0,.45); }
+  .query-wrap .filter-pop { width: 100%; }
+  .filter-pop .flabel { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+  .filter-pop input, .check-panel input { width: 100%; margin: 0 0 8px; padding: 6px 8px; font-size: 12px; }
+  .flist, .check-list { display: grid; gap: 2px; max-height: 240px; overflow: auto; }
+  .filter-pop button.frow-h, .filter-pop button.fback { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px;
+    background: transparent; border: 0; border-radius: 6px; padding: 6px 8px; text-align: left; font-weight: 550; }
+  .filter-pop button.fback { width: auto; color: var(--muted); padding: 0 0 8px; font-size: 12px; font-weight: 600; }
+  .filter-pop button.frow-h:hover, .filter-pop button.fback:hover { background: rgba(255,255,255,.05); border-color: transparent; color: var(--text); }
+  .filter-pop button.fback:hover { background: transparent; }
+  .fmeta { color: var(--muted); font-size: 12px; font-weight: 500; }
+  .fvals { max-height: 160px; overflow: auto; }
+  .fempty { padding: 4px 8px 8px; font-size: 12px; }
+  .fsel { display: inline-flex; align-items: center; gap: 6px; }
+  .fsel > span, .check-judge > span { color: var(--muted); font-size: 12px; font-weight: 600; }
+  .fsel select, .check-row select { font-size: 12px; padding: 2px 8px; max-width: 160px; }
+  .fsel .xbtn { background: transparent; border: 0; color: var(--muted); padding: 0 4px; }
+  .fsel .xbtn:hover { color: var(--text); border-color: transparent; }
+  .check-panel { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--panel2); }
+  .check-judge { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .check-row { display: flex; align-items: center; gap: 8px; padding: 3px 2px; }
+  .check-row label { flex: 1; cursor: pointer; }
+  button.chip.hit { cursor: pointer; }
+  button.chip.hit.on { border-color: var(--accent); background: #1b2a44; }
+  button.pill.hit { cursor: pointer; border: 1px solid transparent; }
+  button.pill.hit.on { border-color: var(--accent); }
+  td.hist-empty { text-align: center; color: var(--muted); padding: 18px 10px; }
   .seg { display: inline-flex; gap: 4px; flex-wrap: wrap; }
   .seg button { padding: 2px 10px; font-size: 12px; border-radius: 999px; color: var(--muted); }
   .seg button.active { border-color: var(--accent); color: var(--text); background: #1b2a44; }
@@ -106,10 +149,10 @@
   .chip.ok { border-color: var(--good); color: var(--good); }
   .chip.bad { border-color: var(--bad); color: var(--bad); }
   .chip .k { color: var(--muted); font-weight: 500; margin-right: 5px; }
-  .params { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-  .params .chip { margin: 0; }
+  .params { display: flex; flex-wrap: nowrap; gap: 4px; align-items: center; }
+  .params .chip { margin: 0; white-space: nowrap; }
+  #history td { white-space: nowrap; }
   #run-params { margin-top: 10px; }
-  td .params { max-width: 360px; }
   details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
   .banner { border-radius: 8px; padding: 10px 14px; border: 1px solid var(--border); background: var(--panel2); font-size: 13px; }
   .banner.warn { border-color: var(--warn); background: rgba(243,192,102,.08); }
@@ -377,7 +420,7 @@
     <section class="kpis" id="kpis"></section>
 
     <div class="section-head" id="products-head" style="margin-top:4px">
-      <h3>By product <span class="muted">· latest run · click a section to expand it</span></h3>
+      <h3>By product</h3>
       <div class="phead">
         <input id="product-q" type="search" placeholder="Filter products…" hidden>
         <div class="seg" id="product-sort"></div>
@@ -401,7 +444,12 @@
     </div>
 
     <section class="card">
-      <h2>Run history <span class="muted" style="text-transform:none;letter-spacing:0">· click a run to open its details, 🗑 to delete it</span></h2>
+      <div class="card-head">
+        <h2>Run history</h2>
+      </div>
+      <div class="seg filter-layouts" id="filter-layouts"></div>
+      <p class="filter-blurb" id="filter-blurb"></p>
+      <div class="hist-filters" id="hist-filters"></div>
       <div class="scroll">
         <table>
           <thead><tr id="history-head"></tr></thead>
@@ -536,6 +584,23 @@ const runNumber = (run) => allRuns.indexOf(run) + 1;
 const runById = (id) => allRuns.find((r) => r.id === id);
 const visibleRuns = () => { const n = +$('range').value; return n ? allRuns.slice(-n) : allRuns; };
 const judgeEnabled = (r) => !!(r.llm_judge && r.llm_judge.enabled);
+// History-table filters. They narrow the rows only; the charts above still use the Show range.
+// params[key] === '' means the run must contain that parameter (any value). A string means that value.
+const LAYOUTS = [
+  { id: 'add', name: '1 · Add filter', blurb: 'Add a parameter, then choose any value or a specific one. Any value keeps only runs that include that parameter.' },
+  { id: 'selects', name: '2 · Selects', blurb: 'Adding a parameter drops runs that do not have it. The dropdown starts at any value; pick a value to narrow further.' },
+  { id: 'checks', name: '3 · Checklist', blurb: 'Check a parameter to keep only runs that contain it. Use the dropdown to require a specific value.' },
+  { id: 'click', name: '4 · Click chips', blurb: 'Click a parameter or the judge pill in the table. Widen an exact value to any value of that parameter from the bar.' },
+  { id: 'search', name: '5 · Search', blurb: 'Type a parameter or judge. Pick “runs with …” for any value, or “key = value” for one value.' },
+];
+function savedLayout() {
+  try {
+    const id = localStorage.getItem('histFilterLayout');
+    if (LAYOUTS.some((l) => l.id === id)) return id;
+  } catch { /* storage unavailable */ }
+  return 'add';
+}
+const histFilter = { judge: 'all', params: {}, layout: savedLayout(), open: false, openKey: null, paramQuery: '' };
 
 // ---- LLM cost. `cost` objects come from summary.cost / summary.products[id].cost (run level, per product)
 // or from a case's cost.total / cost.agent / cost.judge. null = the run had no LLM judge (or predates cost tracking).
@@ -761,22 +826,97 @@ function runParams(r) {
   const p = r && r.params && typeof r.params === 'object' && !Array.isArray(r.params) ? r.params : {};
   return Object.entries(p).filter(([k, v]) => String(k).trim() && v != null && String(v).trim() !== '');
 }
-function paramsHtml(r) {
+function paramsHtml(r, clickable) {
   const bits = [];
   if (r.label) bits.push(`<span class="chip">${esc(r.label)}</span>`);
-  for (const [k, v] of runParams(r)) bits.push(`<span class="chip"><span class="k">${esc(k)}</span>${esc(v)}</span>`);
+  for (const [k, v] of runParams(r)) {
+    const text = String(v);
+    const on = Object.prototype.hasOwnProperty.call(histFilter.params, k) && (histFilter.params[k] === '' || histFilter.params[k] === text);
+    if (clickable) bits.push(`<button type="button" class="chip hit${on ? ' on' : ''}" data-pkey="${esc(k)}" data-pval="${esc(text)}"><span class="k">${esc(k)}</span>${esc(text)}</button>`);
+    else bits.push(`<span class="chip"><span class="k">${esc(k)}</span>${esc(text)}</span>`);
+  }
   return bits.join('');
 }
 
+function matchesHist(r) {
+  if (histFilter.judge === 'on' && !judgeEnabled(r)) return false;
+  if (histFilter.judge === 'off' && judgeEnabled(r)) return false;
+  const have = Object.fromEntries(runParams(r).map(([k, v]) => [k, String(v)]));
+  return Object.entries(histFilter.params).every(([k, v]) => k in have && (!v || have[k] === v));
+}
+
+function PARAM_INDEX_START(pool) {
+  const values = {};
+  const keys = [];
+  pool.forEach((r) => runParams(r).forEach(([k, v]) => {
+    const text = String(v);
+    if (!values[k]) { values[k] = []; keys.push(k); }
+    if (!values[k].includes(text)) values[k].push(text);
+  }));
+  return { keys, values };
+}
+
+function closeHistFilter() {
+  histFilter.open = false;
+  histFilter.openKey = null;
+  histFilter.paramQuery = '';
+}
+
+function renderHistFilters(pool) {
+  const { keys, values } = paramIndex(pool);
+  Object.keys(histFilter.params).forEach((k) => {
+    if (!values[k] || (histFilter.params[k] && !values[k].includes(histFilter.params[k]))) delete histFilter.params[k];
+  });
+  if (histFilter.openKey && !keys.includes(histFilter.openKey)) histFilter.openKey = null;
+  const qEl = $('hist-filter-q');
+  const refocus = !!(qEl && document.activeElement === qEl);
+  const caret = refocus ? qEl.selectionStart : null;
+  const chips = [];
+  if (histFilter.judge !== 'all') {
+    chips.push(`<button type="button" class="fchip" data-clear="judge">LLM judge <b>${esc(histFilter.judge)}</b><span class="x" aria-hidden="true">×</span></button>`);
+  }
+  Object.entries(histFilter.params).forEach(([k, v]) => {
+    if (!v) return;
+    chips.push(`<button type="button" class="fchip" data-clear-param="${esc(k)}">${esc(k)} <b>${esc(v)}</b><span class="x" aria-hidden="true">×</span></button>`);
+  });
+  const judge = ['any', 'on', 'off'].map((id) => {
+    const val = id === 'any' ? 'all' : id;
+    return `<button type="button" data-judge="${val}" class="${histFilter.judge === val ? 'active' : ''}">${id}</button>`;
+  }).join('');
+  const q = histFilter.paramQuery.trim().toLowerCase();
+  const shown = keys.filter((k) => !q || k.toLowerCase().includes(q));
+  const rows = shown.map((k) => {
+    const cur = histFilter.params[k] || '';
+    const open = histFilter.openKey === k;
+    const vals = [`<button type="button" data-set-param="${esc(k)}" data-set-value="" class="${cur ? '' : 'active'}">any</button>`]
+      .concat(values[k].map((v) => `<button type="button" data-set-param="${esc(k)}" data-set-value="${esc(v)}" class="${v === cur ? 'active' : ''}">${esc(v)}</button>`))
+      .join('');
+    return `<div class="frow ${open ? 'open' : ''} ${cur ? 'has' : ''}"><button type="button" class="frow-h" data-open-key="${esc(k)}"><span>${esc(k)}</span><span class="fmeta">${esc(cur || 'any')}<span class="chev">▾</span></span></button>${open ? `<div class="seg fvals">${vals}</div>` : ''}</div>`;
+  }).join('');
+  const paramBlock = keys.length ? `<div class="flabel">Parameters</div><input id="hist-filter-q" type="search" placeholder="Find a parameter…" value="${esc(histFilter.paramQuery)}"><div class="flist">${rows || '<div class="fempty muted">No parameters match.</div>'}</div>` : '';
+  $('hist-filters').innerHTML = `${chips.join('')}<button type="button" class="filter-btn" data-filter-toggle aria-expanded="${histFilter.open}">Filter</button><div class="filter-pop" id="hist-filter-pop" ${histFilter.open ? '' : 'hidden'}>${`<div class="flabel">LLM judge</div><div class="seg">${judge}</div>`}${paramBlock}</div>`;
+  if (refocus && $('hist-filter-q')) {
+    const next = $('hist-filter-q');
+    next.focus();
+    if (caret !== null) next.setSelectionRange(caret, caret);
+  }
+}
+
 function renderHistory() {
-  const runs = visibleRuns().slice().reverse();
-  const ids = productIds(runs);
-  const showParams = runs.some((r) => r.label || runParams(r).length);
+  const pool = visibleRuns().slice().reverse();
+  renderHistFilters(pool);
+  const runs = pool.filter(matchesHist);
+  const ids = productIds(pool);
+  const showParams = pool.some((r) => r.label || runParams(r).length);
   $('history-head').innerHTML = '<th>#</th><th>Time</th>' +
     (showParams ? '<th title="Set in RUN_PARAMS in run_evals.py, or with --param key=value / --label">Parameters</th>' : '') +
     '<th>LLM judge</th><th>Pass rate</th>' +
     (ids.length ? '<th title="one block per product: green = all cases pass, red = some fail">Products</th>' : '') +
     '<th>Correctness</th><th>Relevancy</th><th>Quality</th><th>p95 latency</th><th title="agent + judge, at API list prices">LLM cost</th><th></th>';
+  if (!runs.length) {
+    $('history').innerHTML = `<tr><td class="hist-empty" colspan="${$('history-head').children.length}">No runs match these filters.</td></tr>`;
+    return;
+  }
   $('history').innerHTML = runs.map((r) => {
     const idx = allRuns.indexOf(r);
     const s = r.summary;
@@ -1354,6 +1494,60 @@ $('clear-confirm').addEventListener('click', async () => {
   }
 });
 $('range').addEventListener('change', () => { if (allRuns.length) { renderProducts(); renderHistory(); } });
+function histPool() { return visibleRuns().slice().reverse(); }
+$('hist-filters').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (e.target.closest('[data-filter-toggle]')) {
+    if (histFilter.open) closeHistFilter(); else histFilter.open = true;
+    renderHistFilters(histPool());
+    if (histFilter.open && $('hist-filter-q')) $('hist-filter-q').focus();
+    return;
+  }
+  const clearParam = e.target.closest('[data-clear-param]');
+  if (clearParam) {
+    delete histFilter.params[clearParam.dataset.clearParam];
+    renderHistory();
+    return;
+  }
+  const clear = e.target.closest('[data-clear]');
+  if (clear) {
+    histFilter.judge = 'all';
+    renderHistory();
+    return;
+  }
+  const set = e.target.closest('[data-set-param]');
+  if (set) {
+    if (set.dataset.setValue) histFilter.params[set.dataset.setParam] = set.dataset.setValue;
+    else delete histFilter.params[set.dataset.setParam];
+    renderHistory();
+    return;
+  }
+  const row = e.target.closest('[data-open-key]');
+  if (row) {
+    histFilter.openKey = histFilter.openKey === row.dataset.openKey ? null : row.dataset.openKey;
+    renderHistFilters(histPool());
+    return;
+  }
+  const b = e.target.closest('[data-judge]');
+  if (!b || histFilter.judge === b.dataset.judge) return;
+  histFilter.judge = b.dataset.judge;
+  renderHistory();
+});
+$('hist-filters').addEventListener('input', (e) => {
+  if (e.target.id !== 'hist-filter-q') return;
+  histFilter.paramQuery = e.target.value;
+  renderHistFilters(histPool());
+});
+document.addEventListener('click', (e) => {
+  if (!histFilter.open || $('hist-filters').contains(e.target)) return;
+  closeHistFilter();
+  renderHistFilters(histPool());
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !histFilter.open) return;
+  closeHistFilter();
+  renderHistFilters(histPool());
+});
 $('run-select').addEventListener('change', (e) => go({ runId: e.target.value, caseKey: null }, true));
 $('run-prev').addEventListener('click', () => { const i = allRuns.findIndex((r) => r.id === state.runId); if (i > 0) go({ runId: allRuns[i - 1].id, caseKey: null }, true); });
 $('run-next').addEventListener('click', () => { const i = allRuns.findIndex((r) => r.id === state.runId); if (i < allRuns.length - 1) go({ runId: allRuns[i + 1].id, caseKey: null }, true); });

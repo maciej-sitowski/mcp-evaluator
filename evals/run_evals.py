@@ -36,7 +36,7 @@ PRODUCTS_DIR = "products"
 # empty to store nothing. Override for one run with --param key=value (repeatable), or replace the
 # whole dict with RUN_PARAMS='{"search": "v2", "change": "shorter prompt"}'.
 RUN_PARAMS = {
-    # "search": "v1",
+    "search": "v1",
     # "change": "baseline",
 }
 
