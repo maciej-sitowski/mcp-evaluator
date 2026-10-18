@@ -1,0 +1,1321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCP docs eval dashboard</title>
+<style>
+  :root {
+    --bg: #0f1218; --panel: #171c25; --panel2: #1e2430; --border: #2a3242;
+    --text: #e6e9ef; --muted: #8b95a7;
+    --good: #5fd39a; --bad: #f2677f; --warn: #f3c066; --accent: #6ea8fe;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  [hidden] { display: none !important; }
+  .muted { color: var(--muted); }
+  .up { color: var(--good); } .down { color: var(--bad); }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--muted); }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  select, input, button { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+                          border-radius: 6px; padding: 6px 10px; font: inherit; }
+  button, select { cursor: pointer; }
+  button:hover, select:hover, input:focus { border-color: var(--accent); outline: none; }
+  button:disabled { opacity: .35; cursor: default; border-color: var(--border); }
+
+  /* ---- header + tabs */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+           padding: 10px 24px; border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 10; }
+  .brand h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  .brand .sub { color: var(--muted); font-size: 12px; }
+  nav { display: flex; gap: 4px; }
+  nav button { background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 10px 14px; color: var(--muted); font-weight: 600; }
+  nav button:hover { color: var(--text); border-color: transparent; border-bottom-color: var(--border); }
+  nav button.active { color: var(--text); border-bottom-color: var(--accent); }
+  /* brand and controls take equal flexible space so the tabs stay put when the "Show" selector is hidden */
+  .brand, .controls { flex: 1 1 280px; }
+  .controls { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+  main { padding: 20px 24px 40px; max-width: 1500px; margin: 0 auto; display: grid; gap: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+
+  /* ---- overview */
+  button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--bad); border-radius: 10px; padding: 20px; max-width: 440px; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog h3 { margin: 0 0 8px; }
+  dialog input { width: 100%; box-sizing: border-box; margin: 8px 0 4px; }
+  dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  dialog button.confirm { background: var(--bad); border-color: var(--bad); color: #1a0b10; font-weight: 650; }
+  .section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .section-head h3 { margin: 0; font-size: 15px; font-weight: 650; }
+  .section-head h3 .muted { font-size: 12px; font-weight: 400; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+  .kpi .label { color: var(--muted); font-size: 12px; }
+  .kpi .value { font-size: 26px; font-weight: 700; margin: 2px 0; }
+  .kpi .delta { font-size: 12px; color: var(--muted); }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .card-head h2 { margin: 0; }
+  .seg { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+  .seg button { padding: 2px 10px; font-size: 12px; border-radius: 999px; color: var(--muted); }
+  .seg button.active { border-color: var(--accent); color: var(--text); background: #1b2a44; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
+  tbody tr.run-row { cursor: pointer; }
+  tbody tr.run-row:hover { background: var(--panel2); }
+  td.rowact { width: 1%; text-align: right; }
+  button.rowdel { padding: 0 6px; font-size: 13px; line-height: 1.6; opacity: .35; background: transparent; border-color: transparent; }
+  tr.run-row:hover button.rowdel, button.rowdel:focus-visible { opacity: 1; }
+  button.rowdel:hover { border-color: var(--bad); }
+  .scroll { overflow-x: auto; }
+
+  /* ---- shared bits */
+  .pill { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .pill.pass { background: rgba(95,211,154,.15); color: var(--good); }
+  .pill.fail { background: rgba(242,103,127,.15); color: var(--bad); }
+  .pill.fixed { background: rgba(110,168,254,.18); color: var(--accent); }
+  .pill.regressed { background: rgba(243,192,102,.18); color: var(--warn); }
+  .pill.info { background: var(--panel2); color: var(--muted); border: 1px solid var(--border); }
+  .chip { display: inline-block; border-radius: 4px; padding: 0 6px; margin: 1px 3px 1px 0; font-size: 12px;
+          font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--panel2); border: 1px solid var(--border); }
+  .chip.ok { border-color: var(--good); color: var(--good); }
+  .chip.bad { border-color: var(--bad); color: var(--bad); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  .banner { border-radius: 8px; padding: 10px 14px; border: 1px solid var(--border); background: var(--panel2); font-size: 13px; }
+  .banner.warn { border-color: var(--warn); background: rgba(243,192,102,.08); }
+  .banner.info { border-color: var(--accent); background: rgba(110,168,254,.08); }
+  .banner b { font-weight: 650; }
+
+  /* ---- run tab */
+  .runbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .runbar select { min-width: 260px; max-width: 100%; }
+  .runbar .spacer { flex: 1; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+  /* products */
+  .pdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .phead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .phead input { width: 160px; padding: 3px 10px; font-size: 12px; }
+
+  /* product accordion (overview) */
+  #products { display: grid; gap: 10px; }
+  .pacc { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .pacc-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 0; user-select: none;
+               border-left: 3px solid var(--pc, var(--border)); }
+  .pacc-toggle { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 4px 4px 4px 14px; cursor: pointer; }
+  .pacc-head .open-product { flex: none; }
+  .pacc-toggle:hover { background: #252c3a; border-radius: 8px; }
+  .pacc .chev { display: inline-block; width: 12px; color: var(--muted); font-size: 11px; transition: transform .12s; flex: none; }
+  .pacc.collapsed .chev { transform: rotate(-90deg); }
+  .pacc-name { font-weight: 650; font-size: 14px; white-space: nowrap; }
+  .pacc-rate { display: flex; align-items: center; gap: 8px; min-width: 140px; }
+  .pacc-rate .bar { width: 70px; }
+  .pacc-spacer { flex: 1; }
+  .pacc-body { padding: 4px 16px 16px; border-top: 1px solid var(--border); }
+  .pacc.collapsed .pacc-body { display: none; }
+  .metric-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; padding-top: 14px; }
+  .progress-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 12px 4px; }
+  .progress-card .lbl { font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+  .chart-head b { font-size: 16px; font-variant-numeric: tabular-nums; }
+  .chart-head b.ok { color: var(--good); } .chart-head b.warn { color: var(--warn); } .chart-head b.bad { color: var(--bad); }
+  .progress { width: 100%; height: 160px; display: block; }
+  .progress text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  .progress .pt { cursor: pointer; }
+  .progress .pt:hover { stroke: var(--text); stroke-width: 6; }
+  .more-products { text-align: center; color: var(--accent); cursor: pointer; padding: 10px; }
+  .no-products { text-align: center; color: var(--muted); padding: 16px; }
+  .strip { display: inline-flex; gap: 2px; vertical-align: middle; flex-wrap: wrap; max-width: 220px; }
+  .strip i { width: 9px; height: 14px; border-radius: 2px; background: var(--border); display: block; }
+  .strip i.ok { background: var(--good); } .strip i.bad { background: var(--bad); }
+  .refbox { margin-top: 16px; width: 100%; border: 1px dashed var(--border); border-radius: 10px; padding: 10px 14px; font-size: 13px; }
+  .refbox .who { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
+
+  .split { display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: 16px; align-items: start; }
+  .listcard { padding: 0; position: sticky; top: 64px; max-height: calc(100vh - 84px); display: flex; flex-direction: column; overflow: hidden; }
+  .filters { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .filters .seg { flex: none; flex-wrap: nowrap; gap: 0; align-items: stretch; height: 32px; padding: 2px;
+                  background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; }
+  .filters .seg button { background: transparent; border: 0; border-radius: 6px; color: var(--muted);
+                         font-size: 12px; font-weight: 600; padding: 0 9px; height: 100%; line-height: 1; }
+  .filters .seg button:hover { color: var(--text); border-color: transparent; background: transparent; }
+  .filters .seg button.active, .filters .seg button.active:hover { background: #2c3342; color: var(--text); border-color: transparent; }
+  .filters input { flex: 1; min-width: 0; height: 32px; border-radius: 8px; padding: 0 10px; font-size: 12px; background: var(--panel2); }
+  .filters input::placeholder { color: var(--muted); }
+  .filters input:focus { border-color: #5c6778; }
+  .activefilter { padding: 8px 12px; font-size: 12px; background: #1b2a44; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 8px; }
+  .activefilter a { color: var(--accent); cursor: pointer; }
+  #caselist { overflow-y: auto; flex: 1; }
+  .grp { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+         padding: 9px 12px 9px 14px; background: var(--panel); border-bottom: 1px solid var(--border); border-left: 3px solid transparent;
+         font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; user-select: none; }
+  .grp:hover { background: #222833; }
+  .grp .name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .grp .chev { display: inline-block; width: 12px; color: var(--muted); font-size: 11px; transition: transform .12s; }
+  .grp.collapsed .chev { transform: rotate(-90deg); }
+  .grp .meta { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 500; color: var(--muted); flex: none; }
+  .grp .pcost { display: none; }
+  .grp .count, .grp .nfail { background: none; border: 0; color: var(--muted); padding: 0; border-radius: 0; min-width: 0; }
+  .item { display: flex; gap: 0; padding: 9px 14px 8px 46px; border-bottom: 1px solid rgba(255,255,255,.05); cursor: pointer; border-left: 3px solid transparent; }
+  .item:hover { background: rgba(255,255,255,.03); }
+  .item.sel, .item.sel:hover { background: #2c3342; border-left-color: transparent; }
+  .dot { display: none; }
+  .item > div { min-width: 0; flex: 1; display: flex; flex-direction: column-reverse; gap: 2px; }
+  .item .title { font-weight: 500; font-size: 11px; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; line-height: 1.35; }
+  .item .cost { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+  /* case Cost tab: total, agent, and judge as the same card */
+  .costpane { display: grid; gap: 12px; }
+  .costpane .cmp { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .costpane .cmp .who { margin-bottom: 2px; }
+  .costpane .model { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+  .costpane .plist { margin-top: 10px; }
+  .costpane .prow { font-size: 13px; padding: 3px 0; color: var(--muted); }
+  .costpane .prow b { color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  /* run details: model/cost first, then metric cards. Both sections collapse. auto-fit so extra metrics wrap. */
+  .board { display: grid; gap: 16px; margin-top: 14px; }
+  .board-sec > summary.board-label { list-style: none; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px; width: fit-content;
+    font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  .board-sec > summary.board-label::-webkit-details-marker { display: none; }
+  .board-sec > summary.board-label::marker { content: ''; }
+  .board-sec > summary.board-label::before { content: '▾'; font-size: 11px; transition: transform .12s; }
+  .board-sec:not([open]) > summary.board-label::before { transform: rotate(-90deg); }
+  .board-sec .areagrid, .board-sec .metagrid { margin-top: 8px; }
+  button.pick, button.num, button.big { background: transparent; border: 0; color: inherit; font: inherit; cursor: pointer; }
+  button.pick { font-weight: 600; text-align: left; border-radius: 6px; padding: 3px 6px; }
+  button.pick:hover { background: var(--panel); }
+  button.pick.active { background: #1b2a44; }
+  button.num { font-variant-numeric: tabular-nums; font-weight: 650; border-radius: 6px; padding: 4px 8px; }
+  button.num.ok { color: var(--good); }
+  button.num.bad { color: var(--bad); }
+  button.num.quiet { color: var(--muted); font-weight: 550; }
+  button.num:hover { background: var(--panel); }
+  button.num.active { background: #1b2a44; }
+  .areagrid, .metagrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .areacard, .metacard { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 8px; }
+  .areacard .t, .metacard .t { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  button.big { display: inline-block; padding: 0 4px; margin: 2px 0 0; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.15; border-radius: 6px; }
+  button.big.ok { color: var(--good); }
+  button.big.bad { color: var(--bad); }
+  button.big:hover, button.big.active { background: #1b2a44; }
+  .ast { font-size: 12px; margin: 0 0 8px; }
+  .ast.ok { color: var(--good); }
+  .ast.bad { color: var(--bad); }
+  .plist { border-top: 1px solid var(--border); padding-top: 4px; display: grid; }
+  .prow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .prow .pick { font-weight: 550; font-size: 13px; }
+  .prow button.num { font-size: 13px; padding: 3px 6px; }
+  .bigv { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.15; margin-top: 2px; }
+  .bigv.ok, .metacard .ast.ok { color: var(--good); }
+  .bigv.bad, .metacard .ast.bad { color: var(--bad); }
+  .metacard .plist { margin-top: 4px; }
+  .metacard .plist.flat { border-top: 0; padding-top: 2px; }
+  .metacard .prow { font-size: 13px; padding: 2px 0; color: var(--muted); }
+  .metacard .prow b { color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; }
+  .item .sub { color: var(--text); font-size: 13px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item:has(.dot.pass) .sub { color: #6f7a8c; }
+  .item.sel .sub, .item.sel:has(.dot.pass) .sub { color: var(--text); }
+  .item .tags, .item .cost { display: none; }
+  .tags { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .tag { font-size: 10.5px; padding: 0 7px; border-radius: 999px; background: rgba(242,103,127,.14); color: var(--bad); font-weight: 500; }
+  .none { padding: 28px 16px; text-align: center; }
+
+  .casehead h3 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.4; }
+  .case-meta { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+  .case-meta span + span::before { content: '·'; margin: 0 8px; color: #5c6778; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin: 16px 0 16px; }
+  .tabs button { background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 14px; color: var(--muted); font-weight: 600; }
+  .tabs button:hover { color: var(--text); border-color: transparent; border-bottom-color: var(--border); }
+  .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tabs button:disabled { opacity: .4; cursor: default; }
+
+  /* checks: one collapsible block per area, failing areas open */
+  .chk { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: var(--panel2); overflow: hidden; }
+  .chk > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer; color: var(--text); font-size: 14px; }
+  .chk > summary::-webkit-details-marker { display: none; }
+  .chk > summary::before { content: '▸'; color: var(--muted); font-size: 11px; transition: transform .12s; }
+  .chk[open] > summary::before { transform: rotate(90deg); }
+  .chk .sname { font-weight: 650; }
+  .chk .sdesc { color: var(--muted); font-size: 12px; flex: 1; text-align: right; }
+  .rows { border-top: 1px solid var(--border); background: var(--panel); }
+  .row { display: grid; grid-template-columns: 18px minmax(150px, 210px) 120px 1fr; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); align-items: start; font-size: 13px; }
+  .row:last-child { border-bottom: 0; }
+  .row .ico { font-weight: 700; }
+  .row .ico.ok { color: var(--good); } .row .ico.bad { color: var(--bad); }
+  .row .lbl { font-weight: 600; }
+  .row .help { font-weight: 400; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .row .reason { color: var(--muted); }
+  .row.bad .reason { color: var(--text); }
+  .score { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .bar { display: inline-block; width: 56px; height: 6px; background: var(--panel2); border-radius: 3px; vertical-align: middle; margin-right: 8px; overflow: hidden; }
+  .bar i { display: block; height: 100%; }
+  .bar.ok i { background: var(--good); } .bar.bad i { background: var(--bad); }
+
+  /* search comparison */
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cmp > div { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .cmp .who { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 8px; }
+  .cmp .sub2 { color: var(--muted); font-size: 12px; margin: 10px 0 4px; }
+  .args { display: flex; gap: 6px; flex-wrap: wrap; }
+  .arg { font: 12px ui-monospace, Menlo, Consolas, monospace; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; }
+  .arg b { color: var(--muted); font-weight: 400; }
+
+  /* conversation timeline */
+  .flow { position: relative; display: grid; gap: 12px; width: 100%; padding-left: 24px; }
+  .flow::before { content: ''; position: absolute; left: 6px; top: 10px; bottom: 10px; width: 2px; background: var(--border); }
+  .step { position: relative; border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; background: var(--panel2); font-size: 13px; }
+  .step::before { content: ''; position: absolute; left: -24px; top: 14px; width: 10px; height: 10px; border-radius: 50%; background: var(--border); border: 2px solid var(--panel); }
+  .step.user::before { background: var(--accent); } .step.tool::before { background: var(--warn); }
+  .step.assistant::before { background: var(--good); } .step.error::before { background: var(--bad); }
+  .step .who { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
+  .step.tool { background: var(--panel); }
+  .step.error { color: var(--bad); border-color: var(--bad); }
+  .step .txt { white-space: pre-wrap; }
+  .step pre { margin: 6px 0 0; padding: 8px 10px; background: var(--bg); border-radius: 6px; overflow-x: auto;
+              font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); max-height: 320px; }
+  .step table { margin-top: 6px; font-size: 12px; }
+  .step th, .step td { padding: 4px 8px; }
+  .empty { text-align: center; padding: 48px 16px; }
+  .empty pre { display: inline-block; text-align: left; background: var(--panel2); padding: 12px 16px; border-radius: 8px; }
+  kbd { background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; font-size: 11px; }
+
+  @media (max-width: 960px) {
+    .split { grid-template-columns: 1fr; }
+    .listcard { position: static; max-height: 360px; }
+    .cmp, .costpane .cmp { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>MCP docs · evaluation dashboard</h1>
+    <div class="sub" id="subtitle">loading…</div>
+  </div>
+  <nav>
+    <button id="tab-overview" data-tab="overview">Overview</button>
+    <button id="tab-run" data-tab="run">Run details</button>
+  </nav>
+  <div class="controls">
+    <button id="refresh">Refresh</button>
+  </div>
+</header>
+
+<dialog id="clear-dialog">
+  <h3 id="clear-title"></h3>
+  <p id="clear-text"></p>
+  <div id="clear-typed">
+    <label class="muted" for="clear-input">Type <code>delete</code> to confirm</label>
+    <input id="clear-input" autocomplete="off" spellcheck="false" placeholder="delete">
+  </div>
+  <div id="clear-error" class="muted" style="color:var(--bad)" hidden></div>
+  <div class="actions">
+    <button id="clear-cancel">Cancel</button>
+    <button id="clear-confirm" class="confirm" disabled></button>
+  </div>
+</dialog>
+
+<main>
+  <section id="empty" class="card empty" hidden>
+    <h2>No runs yet</h2>
+    <p>Run the evaluations and refresh this page:</p>
+    <pre>docker compose run --rm evals</pre>
+  </section>
+
+  <!-- ============================== OVERVIEW ============================== -->
+  <div id="view-overview" hidden style="display:contents">
+    <!-- Part 1: the latest run only (compared with the run before it) -->
+    <div class="section-head">
+      <h3>Latest run <span class="muted" id="latest-info"></span></h3>
+      <button id="latest-open">Open details →</button>
+    </div>
+    <section class="kpis" id="kpis"></section>
+
+    <div class="section-head" id="products-head" style="margin-top:4px">
+      <h3>By product <span class="muted">· latest run · click a section to expand it</span></h3>
+      <div class="phead">
+        <input id="product-q" type="search" placeholder="Filter products…" hidden>
+        <div class="seg" id="product-sort"></div>
+      </div>
+    </div>
+    <section class="card" id="products-card">
+      <div id="products"></div>
+    </section>
+
+    <!-- Part 2: one row per stored run -->
+    <div class="section-head" style="margin-top:12px">
+      <h3>History</h3>
+      <span style="display:flex;gap:8px;align-items:center"><label class="muted" for="range">Show</label>
+        <select id="range">
+          <option value="0">all runs</option>
+          <option value="10">last 10</option>
+          <option value="30">last 30</option>
+          <option value="100">last 100</option>
+        </select>
+        <button id="clear-open" class="danger" title="Delete all stored runs">Clear history…</button></span>
+    </div>
+
+    <section class="card">
+      <h2>Run history <span class="muted" style="text-transform:none;letter-spacing:0">· click a run to open its details, 🗑 to delete it</span></h2>
+      <div class="scroll">
+        <table>
+          <thead><tr id="history-head"></tr></thead>
+          <tbody id="history"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================== RUN DETAILS ============================== -->
+  <div id="view-run" hidden style="display:contents">
+    <section class="card">
+      <div class="runbar">
+        <button id="run-prev" title="Older run">‹</button>
+        <select id="run-select"></select>
+        <button id="run-next" title="Newer run">›</button>
+      </div>
+      <div id="banners" style="display:grid;gap:8px;margin-top:12px"></div>
+      <div id="scorecard"></div>
+    </section>
+
+    <section class="split">
+      <div class="card listcard">
+        <div class="filters">
+          <div class="seg" id="case-status"></div>
+          <input id="case-q" type="search" placeholder="Search cases…">
+        </div>
+        <div id="caselist"></div>
+      </div>
+      <div class="card" id="casepanel"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const COLORS = ['#6ea8fe', '#5fd39a', '#f3c066', '#f2677f', '#c4a7e7', '#7fd6e0', '#ef9f76', '#a3c76d', '#e58fb7', '#9aa4b2'];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct = (x) => (x * 100).toFixed(0) + '%';
+const fmtTime = (iso) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+const shortTime = (iso) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+// A case belongs to a product (older runs called it "set").
+const prodOf = (c) => c.product || c.set;
+const caseKey = (c) => prodOf(c) + '/' + c.id;
+
+// Products seen in any run, in first-seen order. Colour: product.json "color", else a stable palette slot.
+let PRODUCTS = {};
+function buildProducts() {
+  const reg = {};
+  allRuns.forEach((r) => Object.entries(r.summary.products || {}).forEach(([id, p]) => {
+    reg[id] = { id, name: p.name || (reg[id] && reg[id].name) || id, color: p.color || (reg[id] && reg[id].color) };
+  }));
+  Object.keys(reg).forEach((id, i) => { reg[id].color = reg[id].color || COLORS[i % COLORS.length]; });
+  PRODUCTS = reg;
+}
+const productIds = (runs) => Object.keys(PRODUCTS).filter((id) => runs.some((r) => r.summary.products && r.summary.products[id]));
+const pinfo = (id) => PRODUCTS[id] || { id, name: id, color: '#8b95a7' };
+const pdot = (id) => `<span class="pdot" style="background:${esc(pinfo(id).color)}"></span>`;
+
+// Does a returned chunk id satisfy a golden's doc reference? (same rules as evals/metrics/base.py `matches`)
+const matchesRef = (rid, pat) => (pat.endsWith('*') ? rid.startsWith(pat.slice(0, -1)) : rid === pat || rid.startsWith(pat + '#'));
+
+// Metrics are shown in these groups (charts, verdict tables). Unknown names fall into "Other".
+const GROUPS = [
+  { name: 'Retrieval', section: 'Search tool (direct call)', match: (n) => ['Recall@K', 'MRR', 'ForbiddenAbsent', 'ProductIsolation'].includes(n) },
+  { name: 'Contract & speed', section: 'Search tool (direct call)', match: (n) => ['FilterCompliance', 'ResponseContract', 'Latency'].includes(n) },
+  { name: 'Correctness', section: 'Correctness (LLM agent)', match: (n) => ['AgentToolUse', 'AgentRecall', 'AnswerFacts', 'Judge:Arguments', 'Judge:Correctness', 'Judge:Answer'].includes(n) },
+  { name: 'Relevancy', section: 'Relevancy (LLM agent)', match: (n) => ['Judge:Relevance', 'Judge:AnswerRelevancy'].includes(n) },
+  { name: 'Quality', section: 'Quality (LLM agent)', match: (n) => n === 'Judge:Quality' },
+];
+// Plain-language explanations, shown in the run details.
+const METRIC_HELP = {
+  'Recall@K': 'Share of the expected docs that the search returned.',
+  'MRR': 'How high the first expected doc ranks (1st = 1.0, 2nd = 0.5, 3rd = 0.33, absent = 0).',
+  'ForbiddenAbsent': 'Docs that must NOT show up are absent.',
+  'ProductIsolation': 'Every result comes from the product that was searched (no leaks from other products).',
+  'FilterCompliance': 'Every result respects the category / max price that was asked for (older runs).',
+  'ResponseContract': 'Response has the required fields, respects the limit and is sorted by score.',
+  'Latency': 'Tool call finished within the time budget.',
+  'AgentToolUse': 'The agent actually called the search tool and got a usable result.',
+  'AgentRecall': "Share of the expected docs that the agent's own search returned.",
+  'AnswerFacts': 'The answer contains every fact the golden lists under must_include.',
+  'Judge:Arguments': 'LLM judge: did the agent turn the question into correct search arguments (right product, good keywords)?',
+  'Judge:Correctness': 'LLM judge: is the answer right compared to the reference answer and the retrieved docs?',
+  'Judge:Answer': 'LLM judge (older runs): is the answer grounded in the tool results?',
+  'Judge:Relevance': 'LLM judge: are the returned doc sections relevant to the question?',
+  'Judge:AnswerRelevancy': 'LLM judge: does the answer address what the customer asked?',
+  'Judge:Quality': 'LLM judge: is the answer clear, concise, helpful and well-toned?',
+};
+// the three LLM-agent groups get a KPI card and a history column
+const LLM_GROUPS = ['Correctness', 'Relevancy', 'Quality'];
+// Short human names for the run details (the technical name stays available as a tooltip).
+const METRIC_LABEL = {
+  'Recall@K': 'Expected docs found', 'MRR': 'Rank of first hit', 'ForbiddenAbsent': 'No forbidden docs',
+  'ProductIsolation': 'Stays within the product', 'FilterCompliance': 'Filters respected', 'ResponseContract': 'Response format',
+  'Latency': 'Speed', 'AgentToolUse': 'Used the search tool', 'AgentRecall': 'Agent found expected docs',
+  'AnswerFacts': 'Required facts in answer',
+  'Judge:Arguments': 'Search arguments', 'Judge:Correctness': 'Answer correctness', 'Judge:Answer': 'Answer grounding (old)',
+  'Judge:Relevance': 'Results relevance', 'Judge:AnswerRelevancy': 'Answer relevancy', 'Judge:Quality': 'Answer quality',
+};
+const labelOf = (n) => METRIC_LABEL[n] || n;
+// Run details show four areas: the three LLM-agent groups first, the plain search-tool checks last.
+const SECTION_ORDER = ['Correctness', 'Relevancy', 'Quality', 'Search tool', 'Other'];
+const SECTION_DESC = {
+  'Correctness': 'Did the agent do and say the right things?',
+  'Relevancy': 'Is it about what the customer asked?',
+  'Quality': 'Is it a good answer?',
+  'Search tool': 'The search tool called directly with fixed arguments (no LLM).',
+  'Other': '',
+};
+const groupOf = (n) => GROUPS.find((g) => g.match(n)) || { name: 'Other', section: 'Other' };
+
+let allRuns = [];                 // run summaries, oldest first
+const fullRunCache = {};
+// UI state; mirrored into the URL hash so views are linkable.
+const state = { tab: 'overview', runId: null, caseKey: null, status: 'all', section: null, product: null, q: '', view: 'checks', productSort: 'attention', productQ: '', productsAll: false };
+let current = { run: null, prev: null };
+
+// ---------------------------------------------------------------- data
+async function api(path) {
+  const res = await fetch(path, { cache: 'no-store' });
+  if (!res.ok) throw new Error(path + ' -> ' + res.status);
+  return res.json();
+}
+async function fullRun(id) {
+  if (!fullRunCache[id]) fullRunCache[id] = await api('/api/runs/' + encodeURIComponent(id));
+  return fullRunCache[id];
+}
+const runNumber = (run) => allRuns.indexOf(run) + 1;
+const runById = (id) => allRuns.find((r) => r.id === id);
+const visibleRuns = () => { const n = +$('range').value; return n ? allRuns.slice(-n) : allRuns; };
+const judgeEnabled = (r) => !!(r.llm_judge && r.llm_judge.enabled);
+
+// ---- LLM cost. `cost` objects come from summary.cost / summary.products[id].cost (run level, per product)
+// or from a case's cost.total / cost.agent / cost.judge. null = the run had no LLM judge (or predates cost tracking).
+const usd = (v) => (v === null || v === undefined ? 'n/a' : v >= 1 ? '$' + v.toFixed(2) : v >= 0.1 ? '$' + v.toFixed(3) : '$' + v.toFixed(4));
+const ktok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(n || 0));
+// "$0.0230", "$0.0230+" when some calls could not be priced (lower bound), "n/a" when nothing could, "–" when there is no cost data
+function costText(c, key = 'total_usd') {
+  if (!c) return '–';
+  const v = c[key];
+  return usd(v) + (v !== null && v !== undefined && c.complete === false ? '+' : '');
+}
+function costTitle(c) {
+  if (!c) return 'No LLM cost: the LLM judge was off, or this run predates cost tracking';
+  const lines = [];
+  if (c.agent_usd !== undefined) lines.push(`agent ${usd(c.agent_usd)} · judge ${usd(c.judge_usd)}`);
+  if (c.avg_case_usd !== undefined && c.avg_case_usd !== null) lines.push(`${usd(c.avg_case_usd)} per case`);
+  lines.push(`${(c.total_tokens || 0).toLocaleString()} tokens in ${c.calls} model calls`);
+  if (c.complete === false) lines.push('some calls could not be priced (model missing from PRICING in run_evals.py): this is a lower bound');
+  return lines.join('\n');
+}
+// mean of the average scores of all metrics in a group (null when the run has none)
+const sectionOf = (n) => { const g = groupOf(n).name; return LLM_GROUPS.includes(g) || g === 'Other' ? g : 'Search tool'; };
+const sectionNames = (names) => SECTION_ORDER.filter((x) => names.some((n) => sectionOf(n) === x));
+const failedIn = (c, section) => Object.entries(c.metrics).filter(([n, m]) => sectionOf(n) === section && !m.success);
+const groupAvg = (sum, group) => {
+  const vals = Object.keys(sum.metrics).filter((n) => groupOf(n).name === group).map((n) => sum.metrics[n].avg_score);
+  return vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : null;
+};
+
+// ---------------------------------------------------------------- routing (URL hash)
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  state.tab = p.has('run') || p.get('tab') === 'run' ? 'run' : 'overview';
+  state.runId = p.get('run') || state.runId;
+  state.caseKey = p.get('case');
+  state.status = p.get('status') || 'all';
+  state.section = p.get('section');
+  state.product = p.get('product');
+  state.view = p.get('view') || 'checks';
+  state.q = p.get('q') || '';
+}
+function writeHash(push) {
+  const p = new URLSearchParams();
+  if (state.tab === 'run') {
+    if (state.runId) p.set('run', state.runId); else p.set('tab', 'run');
+    if (state.caseKey) p.set('case', state.caseKey);
+    if (state.status !== 'all') p.set('status', state.status);
+    if (state.section) p.set('section', state.section);
+    if (state.product) p.set('product', state.product);
+    if (state.view !== 'checks') p.set('view', state.view);
+    if (state.q) p.set('q', state.q);
+  }
+  const url = location.pathname + (p.toString() ? '#' + p.toString() : '');
+  history[push ? 'pushState' : 'replaceState'](null, '', url);
+}
+// Change state, update URL, redraw. `push` creates a browser-history entry (tab / run switches).
+async function go(patch, push = false) {
+  Object.assign(state, patch);
+  writeHash(push);
+  await renderAll();
+}
+
+// ---------------------------------------------------------------- overview: KPIs
+function deltaHtml(curr, prev, { higherIsBetter = true, fmt = (x) => x, unit = '' } = {}) {
+  if (prev === undefined || prev === null || curr === undefined || curr === null) return '<span class="delta">first run</span>';
+  const d = curr - prev;
+  if (Math.abs(d) < 1e-9) return '<span class="delta">no change vs previous run</span>';
+  const good = (d > 0) === higherIsBetter;
+  return `<span class="delta ${good ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${fmt(Math.abs(d))}${unit} vs previous run</span>`;
+}
+
+function renderKpis() {
+  const cur = allRuns[allRuns.length - 1];
+  const prev = allRuns[allRuns.length - 2];
+  const s = cur.summary, p = prev && prev.summary;
+  const cards = [
+    ['Pass rate', pct(s.pass_rate), deltaHtml(s.pass_rate * 100, p && p.pass_rate * 100, { fmt: (x) => x.toFixed(0), unit: ' pp' }),
+      `${s.cases_passed} of ${s.cases_total} cases`],
+  ];
+  LLM_GROUPS.forEach((g) => {
+    const v = groupAvg(s, g);
+    if (v !== null) cards.push([g + ' (avg)', v.toFixed(2), deltaHtml(v, p ? groupAvg(p, g) : null, { fmt: (x) => x.toFixed(2) })]);
+  });
+  cards.push(['Latency p95', s.latency_ms.p95.toFixed(1) + ' ms',
+    deltaHtml(s.latency_ms.p95, p && p.latency_ms.p95, { higherIsBetter: false, fmt: (x) => x.toFixed(1), unit: ' ms' })]);
+  $('latest-info').textContent = `· #${allRuns.length} · ${fmtTime(cur.timestamp)} · deltas vs previous run`;
+  $('latest-open').onclick = () => go({ tab: 'run', runId: cur.id, caseKey: null, status: 'all', section: null, product: null, q: '' }, true);
+  $('kpis').innerHTML = cards.map(([label, value, delta, note]) =>
+    `<div class="card kpi"><div class="label">${esc(label)}${note ? ` · ${esc(note)}` : ''}</div><div class="value">${esc(value)}</div>${delta}</div>`).join('');
+}
+
+// ---------------------------------------------------------------- overview: by product
+// Average score of every metric in an area (Correctness, Relevancy, Quality, Search tool).
+function sectionAvg(sum, section) {
+  if (!sum || !sum.metrics) return null;
+  const vals = Object.keys(sum.metrics).filter((n) => sectionOf(n) === section && typeof sum.metrics[n].avg_score === 'number').map((n) => sum.metrics[n].avg_score);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
+// One metric's score across the runs in the current range. `threshold` draws the target line (0..1).
+function progressChart(points, color, threshold) {
+  const W = 360, H = 160, L = 30, R = 10, T = 12, B = 22;
+  const iw = W - L - R, ih = H - T - B;
+  if (!points.length) return '';
+  const yOf = (v) => T + (1 - Math.max(0, Math.min(1, v))) * ih;
+  const xOf = (i) => L + (points.length < 2 ? iw / 2 : (i / (points.length - 1)) * iw);
+  points.forEach((p, i) => { p.x = xOf(i); p.y = yOf(p.v); });
+  const d = points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('');
+  const grid = [0, 0.5, 1].map((g) => {
+    const yy = yOf(g);
+    return `<line x1="${L}" y1="${yy.toFixed(1)}" x2="${W - R}" y2="${yy.toFixed(1)}" stroke="currentColor" stroke-opacity="0.18"/>` +
+      `<text x="${L - 6}" y="${yy.toFixed(1)}" dominant-baseline="middle" text-anchor="end">${Math.round(g * 100)}</text>`;
+  }).join('');
+  const thr = typeof threshold === 'number'
+    ? `<line x1="${L}" y1="${yOf(threshold).toFixed(1)}" x2="${W - R}" y2="${yOf(threshold).toFixed(1)}" stroke="currentColor" stroke-opacity="0.45" stroke-dasharray="4 3"><title>target ${Math.round(threshold * 100)}%</title></line>`
+    : '';
+  const step = Math.max(1, Math.ceil(points.length / 8));
+  const xlab = points.map((p, i) => (i % step && i !== points.length - 1) ? '' :
+    `<text x="${p.x.toFixed(1)}" y="${H - 4}" text-anchor="middle">#${p.n}</text>`).join('');
+  const dots = points.map((p) =>
+    `<circle class="pt" data-run="${esc(p.runId)}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${esc(color)}"><title>#${p.n} · ${pct(p.v)} · click to open</title></circle>`).join('');
+  return `<svg class="progress" viewBox="0 0 ${W} ${H}" role="img">${grid}${thr}` +
+    `<path d="${d}" fill="none" stroke="${esc(color)}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${dots}${xlab}</svg>`;
+}
+
+const PRODUCT_LIMIT = 8;   // sections shown before "Show all"
+
+// which products are folded shut in the overview accordion (remembered across reloads)
+const collapsedOverviewProducts = new Set((() => { try { return JSON.parse(localStorage.getItem('collapsedOverviewProducts') || '[]'); } catch { return []; } })());
+const saveCollapsedOverview = () => { try { localStorage.setItem('collapsedOverviewProducts', JSON.stringify([...collapsedOverviewProducts])); } catch { /* storage unavailable */ } };
+
+// the threshold a group is scored against, read from its LLM-judge metric in a full run (these groups also
+// include deterministic metrics with their own, unrelated thresholds, e.g. 1.0 — only the judge one is the "target")
+function groupThreshold(fullRunWithCases, group) {
+  if (fullRunWithCases) {
+    for (const c of fullRunWithCases.cases) {
+      for (const [name, m] of Object.entries(c.metrics)) {
+        if (name.startsWith('Judge:') && groupOf(name).name === group && typeof m.threshold === 'number') return m.threshold;
+      }
+    }
+  }
+  return 0.7;
+}
+
+async function renderProducts() {
+  const cur = allRuns[allRuns.length - 1], prev = allRuns[allRuns.length - 2];
+  const all = Object.keys(cur.summary.products || {});
+  $('products-head').hidden = $('products-card').hidden = !all.length;
+  if (!all.length) return;
+  const runs = visibleRuns();
+
+  // sort: products that need attention first (lowest pass rate), or by name
+  const rate = (id) => cur.summary.products[id].pass_rate;
+  const sorts = [['attention', 'Needs attention first'], ['name', 'Name']];
+  $('product-sort').innerHTML = all.length < 2 ? '' : sorts.map(([v, l]) =>
+    `<button data-sort="${v}" class="${state.productSort === v ? 'active' : ''}">${l}</button>`).join('');
+  document.querySelectorAll('#product-sort button').forEach((b) =>
+    b.addEventListener('click', () => { state.productSort = b.dataset.sort; renderProducts(); }));
+  $('product-q').hidden = all.length <= PRODUCT_LIMIT;
+  $('product-q').value = state.productQ;
+
+  const q = state.productQ.trim().toLowerCase();
+  let ids = all.filter((id) => !q || (id + ' ' + pinfo(id).name).toLowerCase().includes(q));
+  ids.sort((a, b) => state.productSort === 'name' ? pinfo(a).name.localeCompare(pinfo(b).name) : rate(a) - rate(b) || pinfo(a).name.localeCompare(pinfo(b).name));
+  const hidden = !q && !state.productsAll && ids.length > PRODUCT_LIMIT ? ids.length - PRODUCT_LIMIT : 0;
+  if (hidden) ids = ids.slice(0, PRODUCT_LIMIT);
+
+  const curFull = await fullRun(cur.id).catch(() => null);
+  const thresholds = Object.fromEntries(LLM_GROUPS.map((g) => [g, groupThreshold(curFull, g)]));
+
+  if (!ids.length) {
+    $('products').innerHTML = `<div class="no-products">No product matches “${esc(state.productQ)}”.</div>`;
+    return;
+  }
+
+  $('products').innerHTML = ids.map((id) => {
+    const p = cur.summary.products[id];
+    const before = prev && prev.summary.products && prev.summary.products[id];
+    const d = before ? (p.pass_rate - before.pass_rate) * 100 : null;
+    const delta = d === null ? '<span class="muted">new</span>' : Math.abs(d) < 0.5 ? '<span class="muted">no change</span>'
+      : `<span class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(0)} pp vs previous run</span>`;
+    const ok = p.pass_rate >= 0.999;
+    const folded = collapsedOverviewProducts.has(id);
+    const sections = SECTION_ORDER.filter((sec) => sec !== 'Other' && runs.some((r) => sectionAvg(r.summary.products && r.summary.products[id], sec) !== null));
+    const charts = sections.map((sec) => {
+      const points = [];
+      runs.forEach((r) => {
+        const v = sectionAvg(r.summary.products && r.summary.products[id], sec);
+        if (v === null) return;
+        points.push({ v, n: runNumber(r), runId: r.id });
+      });
+      const latest = points[points.length - 1];
+      const thr = LLM_GROUPS.includes(sec) ? thresholds[sec] : 1;
+      const tone = !latest ? '' : latest.v >= thr ? 'ok' : latest.v >= thr - 0.15 ? 'warn' : 'bad';
+      const color = tone === 'bad' ? 'var(--bad)' : tone === 'warn' ? 'var(--warn)' : 'var(--good)';
+      return `<div class="progress-card"><div class="chart-head"><span class="lbl" title="${esc(SECTION_DESC[sec] || '')}">${esc(sec)}</span><b class="${tone}">${latest ? pct(latest.v) : '–'}</b></div>${progressChart(points, color, LLM_GROUPS.includes(sec) ? thr : null)}</div>`;
+    }).join('');
+    return `<div class="pacc ${folded ? 'collapsed' : ''}" data-id="${esc(id)}">
+      <div class="pacc-head" style="--pc:${esc(pinfo(id).color)}">
+        <div class="pacc-toggle" role="button" tabindex="0" aria-expanded="${!folded}">
+          <span class="chev">▾</span>
+          <span class="pacc-name">${esc(pinfo(id).name)}</span>
+          <div class="pacc-rate"><span class="bar ${ok ? 'ok' : 'bad'}"><i style="width:${Math.round(p.pass_rate * 100)}%"></i></span>
+            <b>${pct(p.pass_rate)}</b><span class="muted">${p.cases_passed}/${p.cases_total}</span></div>
+          <span class="pacc-spacer"></span>
+          <span class="muted" style="font-size:12px">${delta}</span>
+        </div>
+        <button class="open-product" data-open="${esc(id)}">Open cases →</button>
+      </div>
+      <div class="pacc-body">
+        ${charts ? `<div class="metric-charts">${charts}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('') + (hidden ? `<div class="more-products" id="show-all-products">Show all ${all.length} products (${hidden} more)</div>` : '');
+
+  document.querySelectorAll('.pacc-toggle').forEach((el) => {
+    const toggle = () => {
+      const id = el.closest('.pacc').dataset.id;
+      if (collapsedOverviewProducts.has(id)) collapsedOverviewProducts.delete(id); else collapsedOverviewProducts.add(id);
+      saveCollapsedOverview();
+      renderProducts();
+    };
+    el.addEventListener('click', toggle);
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  });
+  document.querySelectorAll('.open-product').forEach((b) => b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    go({ tab: 'run', runId: cur.id, caseKey: null, status: 'all', section: null, product: b.dataset.open, q: '' }, true);
+  }));
+  document.querySelectorAll('.progress .pt').forEach((c) => c.addEventListener('click', () =>
+    go({ tab: 'run', runId: c.dataset.run, caseKey: null, status: 'all', section: null, product: null, q: '' }, true)));
+  const more = $('show-all-products');
+  if (more) more.addEventListener('click', () => { state.productsAll = true; renderProducts(); });
+}
+
+// ---------------------------------------------------------------- overview: history table
+function renderHistory() {
+  const runs = visibleRuns().slice().reverse();
+  const ids = productIds(runs);
+  $('history-head').innerHTML = '<th>#</th><th>Time</th><th>LLM judge</th><th>Pass rate</th>' +
+    (ids.length ? '<th title="one block per product: green = all cases pass, red = some fail">Products</th>' : '') +
+    '<th>Correctness</th><th>Relevancy</th><th>Quality</th><th>p95 latency</th><th title="agent + judge, at API list prices">LLM cost</th><th></th>';
+  $('history').innerHTML = runs.map((r) => {
+    const idx = allRuns.indexOf(r);
+    const prev = allRuns[idx - 1];
+    const s = r.summary;
+    let delta = '';
+    if (prev) {
+      const d = (s.pass_rate - prev.summary.pass_rate) * 100;
+      if (Math.abs(d) >= 0.5) delta = ` <span class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'}${Math.abs(d).toFixed(0)}pp</span>`;
+    }
+    const g = (name) => { const v = groupAvg(s, name); return v === null ? '–' : v.toFixed(2); };
+    const judge = judgeEnabled(r) ? '<span class="pill pass" title="agent + LLM judge metrics included">on</span>' : '<span class="pill info" title="deterministic metrics only">off</span>';
+    const failing = ids.filter((id) => s.products && s.products[id] && s.products[id].pass_rate < 0.999);
+    const strip = ids.map((id) => {
+      const pr = s.products && s.products[id];
+      const tip = `${pinfo(id).name}: ${pr ? `${pr.cases_passed}/${pr.cases_total} passed` : 'not in this run'}`;
+      return `<i class="${pr ? (pr.pass_rate >= 0.999 ? 'ok' : 'bad') : ''}" title="${esc(tip)}"></i>`;
+    }).join('');
+    const prodCells = ids.length ? `<td><span class="strip">${strip}</span> ${failing.length
+      ? `<span class="down" title="${esc(failing.map((id) => pinfo(id).name).join(', '))}">${failing.length} failing</span>` : '<span class="up">all pass</span>'}</td>` : '';
+    return `<tr class="run-row" data-id="${esc(r.id)}">
+      <td>${idx + 1}</td><td>${esc(fmtTime(r.timestamp))}</td><td>${judge}</td>
+      <td title="${s.cases_passed} of ${s.cases_total} cases passed"><b>${pct(s.pass_rate)}</b>${delta}</td>${prodCells}
+      <td>${g('Correctness')}</td><td>${g('Relevancy')}</td><td>${g('Quality')}</td>
+      <td>${s.latency_ms.p95.toFixed(1)} ms</td>
+      <td title="${esc(costTitle(s.cost))}">${esc(costText(s.cost))}</td>
+      <td class="rowact"><button class="rowdel" data-del="${esc(r.id)}" title="Delete this run" aria-label="Delete run #${idx + 1}">🗑</button></td></tr>`;
+  }).join('');
+  document.querySelectorAll('button.rowdel').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); askDeleteRun(b.dataset.del); }));
+  document.querySelectorAll('tr.run-row').forEach((tr) => tr.addEventListener('click', () =>
+    go({ tab: 'run', runId: tr.dataset.id, caseKey: null, status: 'all', section: null, product: null, q: '' }, true)));
+}
+
+// ---------------------------------------------------------------- run tab: toolbar, banners, scorecard
+function renderRunBar(run) {
+  const idx = allRuns.findIndex((r) => r.id === run.id);
+  $('run-select').innerHTML = allRuns.slice().reverse().map((r) => {
+    const i = allRuns.indexOf(r);
+    const label = `#${i + 1} · ${shortTime(r.timestamp)} · ${pct(r.summary.pass_rate)} passed`;
+    return `<option value="${esc(r.id)}" ${r.id === run.id ? 'selected' : ''}>${esc(label)}</option>`;
+  }).join('');
+  $('run-prev').disabled = idx <= 0;
+  $('run-next').disabled = idx >= allRuns.length - 1;
+}
+
+function renderBanners(run) {
+  const out = [];
+  if (!judgeEnabled(run)) {
+    const why = run.llm_judge && run.llm_judge.status ? run.llm_judge.status : 'this run predates the LLM judge';
+    out.push(`<div class="banner info"><b>No LLM-judge metrics in this run.</b> ${esc(why)}</div>`);
+  } else {
+    const broken = run.cases.filter((c) => c.agent && c.agent.error);
+    if (broken.length) {
+      out.push(`<div class="banner warn"><b>${broken.length} case${broken.length > 1 ? 's' : ''} had agent errors</b> ` +
+        `(e.g. <code>${esc(broken[0].agent.error)}</code>). Their agent/judge scores are 0 because the model never produced an answer, ` +
+        `not because search quality dropped.</div>`);
+    }
+  }
+  $('banners').innerHTML = out.join('');
+}
+
+const cellOn = (sec, id) => state.section === sec && (state.product || null) === (id || null);
+const nameOn = (id) => !!id && state.product === id && !state.section;
+
+function scoreModel(run) {
+  const ids = [...new Set(run.cases.map(prodOf))];
+  const sections = sectionNames([...new Set(run.cases.flatMap((c) => Object.keys(c.metrics)))]);
+  const stat = (cases, sec) => {
+    const scores = cases.flatMap((c) => Object.entries(c.metrics).filter(([n]) => sectionOf(n) === sec).map(([, m]) => m.score));
+    if (!scores.length) return null;
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    return { avg, failing: cases.filter((c) => failedIn(c, sec).length).length, total: cases.length };
+  };
+  const rowFor = (id, cases) => ({
+    id, name: id ? pinfo(id).name : 'All products', n: cases.length,
+    cells: Object.fromEntries(sections.map((sec) => [sec, stat(cases, sec)])),
+  });
+  const rows = [];
+  if (ids.length > 1) rows.push(rowFor(null, run.cases));
+  ids.forEach((id) => rows.push(rowFor(id, run.cases.filter((c) => prodOf(c) === id))));
+  return { sections, rows };
+}
+
+// One card per area in this run. A new group added to GROUPS and SECTION_ORDER appears here and wraps with the others.
+function metricCards(m) {
+  const overall = m.rows.find((r) => !r.id) || m.rows[0];
+  const products = m.rows.filter((r) => r.id);
+  return m.sections.map((sec) => {
+    const all = overall.cells[sec];
+    const big = all
+      ? `<button class="big ${all.failing ? 'bad' : 'ok'} ${cellOn(sec, overall.id) ? 'active' : ''}" data-sec="${esc(sec)}" data-product="${esc(overall.id || '')}" title="${esc(SECTION_DESC[sec])}">${all.avg.toFixed(2)}</button>`
+      : '<div class="bigv">–</div>';
+    const status = !all ? '–' : all.failing ? `${all.failing} of ${all.total} failed` : 'all passed';
+    const ranked = products.length > 1
+      ? products.map((r) => ({ r, st: r.cells[sec] })).filter((x) => x.st).sort((a, b) => a.st.avg - b.st.avg)
+      : [];
+    const rows = ranked.map(({ r, st }) => `<div class="prow"><button class="pick ${nameOn(r.id) ? 'active' : ''}" data-pick="${esc(r.id)}">${pdot(r.id)}${esc(r.name)}</button><button class="num ${st.failing ? 'bad' : 'quiet'} ${cellOn(sec, r.id) ? 'active' : ''}" data-sec="${esc(sec)}" data-product="${esc(r.id)}" title="${esc(st.failing ? `${st.failing} of ${st.total} cases failed` : 'all cases passed')}">${st.avg.toFixed(2)}</button></div>`).join('');
+    return `<div class="areacard"><div class="t" title="${esc(SECTION_DESC[sec])}">${esc(sec)}</div>${big}<div class="ast ${all && all.failing ? 'bad' : 'ok'}">${esc(status)}</div>${rows ? `<div class="plist">${rows}</div>` : ''}</div>`;
+  }).join('');
+}
+
+function modelCard(run) {
+  const line = (label, value) => `<div class="prow"><span>${label}</span><b>${value}</b></div>`;
+  if (!judgeEnabled(run)) {
+    const why = run.llm_judge && run.llm_judge.status ? run.llm_judge.status : 'This run has no LLM judge.';
+    return `<div class="metacard" title="${esc(why)}"><div class="t">Model</div><div class="plist flat">${line('Agent', '–')}${line('Judge', '–')}</div><div class="ast">No LLM judge</div></div>`;
+  }
+  const j = run.llm_judge;
+  const agentP = j.agent_provider || 'cursor';
+  const judgeP = j.judge_provider || 'cursor';
+  const who = (provider, model) => esc(provider) + ' / ' + esc(model);
+  const tip = `agent: ${agentP}/${j.agent_model} · judge: ${judgeP}/${j.judge_model}`;
+  return `<div class="metacard" title="${esc(tip)}"><div class="t">Model</div><div class="plist flat">${line('Agent', who(agentP, j.agent_model))}${line('Judge', who(judgeP, j.judge_model))}</div></div>`;
+}
+
+function costCard(c) {
+  if (!c) return '';
+  const tip = [
+    `${(c.input_tokens || 0).toLocaleString()} input · ${(c.output_tokens || 0).toLocaleString()} output`,
+    `${(c.cache_read_tokens || 0).toLocaleString()} cache read · ${(c.cache_write_tokens || 0).toLocaleString()} cache write`,
+    c.complete === false ? 'some calls could not be priced: this is a lower bound' : '',
+  ].filter(Boolean).join('\n');
+  return `<div class="metacard" title="${esc(tip)}"><div class="t">Cost</div><div class="bigv">${esc(costText(c))}</div><div class="ast">${esc(ktok(c.total_tokens))} tokens · ${c.calls} calls</div><div class="plist"><div class="prow"><span>Agent</span><b>${esc(usd(c.agent_usd))}</b></div><div class="prow"><span>Judge</span><b>${esc(usd(c.judge_usd))}</b></div></div></div>`;
+}
+
+function runCards(run) {
+  const s = run.summary;
+  const tone = s.pass_rate >= 1 ? 'ok' : 'bad';
+  const passed = `<div class="metacard"><div class="t">Passed</div><div class="bigv ${tone}">${s.cases_passed}/${s.cases_total}</div><div class="ast ${tone}">${pct(s.pass_rate)} of cases</div></div>`;
+  return passed + modelCard(run) + costCard(s.cost);
+}
+
+function boardOpen(id) {
+  try {
+    const saved = JSON.parse(localStorage.getItem('boardOpen') || '{}');
+    if (id in saved) return !!saved[id];
+  } catch { /* storage unavailable */ }
+  return true;
+}
+function renderScorecard(run) {
+  const m = scoreModel(run);
+  const sec = (id, label, body) => `<details class="board-sec" data-board="${id}" ${boardOpen(id) ? 'open' : ''}><summary class="board-label">${label}</summary>${body}</details>`;
+  $('scorecard').innerHTML = `<div class="board">${sec('run', 'This run', `<div class="metagrid">${runCards(run)}</div>`)}${sec('metrics', 'Metrics', `<div class="areagrid">${metricCards(m)}</div>`)}</div>`;
+  document.querySelectorAll('#scorecard .board-sec').forEach((el) => el.addEventListener('toggle', () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('boardOpen') || '{}');
+      saved[el.dataset.board] = el.open;
+      localStorage.setItem('boardOpen', JSON.stringify(saved));
+    } catch { /* storage unavailable */ }
+  }));
+}
+
+// ---------------------------------------------------------------- run tab: case list (master)
+function changeOf(c, prev) {
+  const before = prev && prev.cases.find((x) => caseKey(x) === caseKey(c));
+  if (!before) return '';
+  return before.passed && !c.passed ? 'regressed' : !before.passed && c.passed ? 'fixed' : '';
+}
+
+function visibleCases(run, prev) {
+  const q = state.q.trim().toLowerCase();
+  return run.cases.filter((c) => {
+    const change = changeOf(c, prev);
+    if (state.status === 'failed' && c.passed) return false;
+    if (state.status === 'changed' && !change) return false;
+    if (state.product && prodOf(c) !== state.product) return false;
+    if (state.section && !failedIn(c, state.section).length) return false;
+    if (q && !(c.id + ' ' + prodOf(c) + ' ' + c.input).toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+// Products whose case list is folded away (remembered across reloads).
+const collapsedProducts = new Set((() => { try { return JSON.parse(localStorage.getItem('collapsedProducts') || '[]'); } catch { return []; } })());
+const saveCollapsed = () => { try { localStorage.setItem('collapsedProducts', JSON.stringify([...collapsedProducts])); } catch { /* storage unavailable */ } };
+// while searching, show every match even inside folded products
+const isCollapsed = (id) => collapsedProducts.has(id) && !state.q.trim();
+
+function orderedCases(run, prev) {
+  // grouped by product, failures first inside each group
+  const sets = [];
+  visibleCases(run, prev).forEach((c) => {
+    let g = sets.find((x) => x.id === prodOf(c));
+    if (!g) sets.push((g = { id: prodOf(c), name: pinfo(prodOf(c)).name, cases: [] }));
+    g.cases.push(c);
+  });
+  sets.forEach((g) => g.cases.sort((a, b) => Number(a.passed) - Number(b.passed)));
+  return sets;
+}
+
+function failedSections(c) {
+  return sectionNames(Object.keys(c.metrics)).filter((sec) => failedIn(c, sec).length);
+}
+
+function caseCostTitle(cost) {
+  const part = (name, r) => (r && r.known ? `${name} ${usd(r.cost_usd)} · ${(r.total_tokens || 0).toLocaleString()} tokens` : `${name} –`);
+  return [part('agent', cost.agent), part('judge', cost.judge)].join('\n');
+}
+
+// Cost tab: model, tokens, and how the price was obtained, for the agent and the judge.
+function roleCostCard(name, r, opt = {}) {
+  if (!r || !r.known) return `<div><div class="who">${esc(name)}</div><span class="muted">No usage recorded.</span></div>`;
+  const SRC = { reported: 'billed by the provider', estimated: 'tokens × list price' };
+  const model = opt.model != null ? opt.model : `${r.provider} / ${r.model}`;
+  const source = opt.source != null ? opt.source : (r.cost_source ? SRC[r.cost_source] : 'model not in PRICING, cost unknown');
+  const num = (n) => (n || 0).toLocaleString();
+  const row = (k, v) => `<div class="prow"><span>${esc(k)}</span><b>${esc(String(v))}</b></div>`;
+  const rows = [
+    row('Input', num(r.input_tokens)),
+    row('Output', num(r.output_tokens)),
+    row('Cache read', num(r.cache_read_tokens)),
+    row('Cache write', num(r.cache_write_tokens)),
+  ];
+  if (r.reasoning_tokens) rows.push(row('Reasoning', num(r.reasoning_tokens)));
+  if (r.ai_credits !== null && r.ai_credits !== undefined) rows.push(row('AI credits', r.ai_credits.toFixed(3)));
+  rows.push(row('Calls', r.calls), row('Price', source));
+  const calls = `${r.calls} call${r.calls === 1 ? '' : 's'}`;
+  return `<div><div class="who">${esc(name)}</div><div class="model">${esc(model)}</div>
+    <div class="bigv">${esc(usd(r.cost_usd))}</div>
+    <div class="ast">${esc(ktok(r.total_tokens))} tokens · ${esc(calls)}${opt.suffix || ''}</div>
+    <div class="plist">${rows.join('')}</div></div>`;
+}
+
+function caseCostHtml(c) {
+  const cost = c.cost;
+  if (!cost || !cost.total) return '<div class="muted">No model or cost data for this case.</div>';
+  const { agent, judge, total } = cost;
+  const named = (r) => (r && r.known ? `${r.provider} / ${r.model}` : '');
+  const agentModel = named(agent);
+  const judgeModel = named(judge);
+  const totalModel = agentModel && agentModel === judgeModel ? agentModel : [agentModel, judgeModel].filter(Boolean).join(' · ');
+  const sources = [agent, judge].filter((r) => r && r.known).map((r) => r.cost_source);
+  const totalSource = total.complete === false ? 'lower bound'
+    : sources.length && sources.every((s) => s === 'reported') ? 'billed by the provider'
+    : sources.length && sources.every((s) => s === 'estimated') ? 'tokens × list price'
+    : sources.some(Boolean) ? 'mixed' : 'model not in PRICING, cost unknown';
+  const secs = c.agent && c.agent.duration_ms ? ` · ${(c.agent.duration_ms / 1000).toFixed(1)} s` : '';
+  const note = total.complete === false
+    ? '<div class="hint">Some calls could not be priced (model missing from PRICING). This total is a lower bound.</div>' : '';
+  return `<div class="costpane"><div class="cmp">${roleCostCard('Total', total, { model: totalModel, source: totalSource })}${roleCostCard('Agent', agent, { suffix: secs })}${roleCostCard('Judge', judge)}</div>${note}</div>`;
+}
+
+function renderCaseList() {
+  const { run, prev } = current;
+  const sets = orderedCases(run, prev);
+  const statuses = [['all', 'All'], ['failed', 'Failed']].concat(prev ? [['changed', 'Changed']] : []);
+  if (!statuses.some(([v]) => v === state.status)) state.status = 'all';
+  $('case-status').innerHTML = statuses.map(([v, l]) =>
+    `<button data-status="${v}" class="${state.status === v ? 'active' : ''}">${l}</button>`).join('');
+  document.querySelectorAll('#case-status button').forEach((b) => b.addEventListener('click', () => go({ status: b.dataset.status })));
+  $('case-q').hidden = run.cases.length <= 8;       // search only earns its space with many cases
+  $('case-q').value = state.q;
+
+  const parts = [state.product ? `<b>${esc(pinfo(state.product).name)}</b>` : '', state.section ? `failing <b>${esc(state.section)}</b>` : ''].filter(Boolean);
+  const banner = parts.length
+    ? `<div class="activefilter"><span>Showing ${parts.join(' · ')}</span><a id="clear-section">clear</a></div>` : '';
+  if (!sets.length) {
+    $('caselist').innerHTML = banner + '<div class="none muted">No cases match these filters.</div>';
+  } else {
+    const multi = sets.length > 1 || !!(run.summary.products && Object.keys(run.summary.products).length);
+    $('caselist').innerHTML = banner + sets.map((g) => {
+      const failed = g.cases.filter((c) => !c.passed).length;
+      const folded = multi && isCollapsed(g.id);
+      const pcost = (run.summary.products && run.summary.products[g.id] || {}).cost;
+      return (multi ? `<div class="grp ${folded ? 'collapsed' : ''}" style="--pc:${esc(pinfo(g.id).color)}" data-product="${esc(g.id)}" role="button" tabindex="0" aria-expanded="${!folded}" title="${folded ? 'Expand' : 'Collapse'}"><span class="name"><span class="chev">▾</span><span>${esc(g.name)}</span></span><span class="meta">${pcost ? `<span class="pcost" title="${esc(costTitle(pcost))}">${esc(costText(pcost))}</span>` : ''}${failed ? `<span class="nfail">${failed} failed</span>` : ''}<span class="count">${g.cases.length}</span></span></div>` : '') +
+        (folded ? '' : g.cases.map((c) => {
+          const change = changeOf(c, prev);
+          const tags = failedSections(c);
+          return `<div class="item ${caseKey(c) === state.caseKey ? 'sel' : ''}" data-key="${esc(caseKey(c))}">
+            <span class="dot ${c.passed ? 'pass' : 'fail'}"></span>
+            <div><div class="title"><span class="cid" title="${esc(c.id)}">${esc(c.id)}</span>${change ? `<span class="pill ${change}">${change}</span>` : ''}${tags.length ? `<span class="tags">${tags.map((x) => `<span class="tag">${esc(x)}</span>`).join('')}</span>` : ''}${c.cost && c.cost.total ? `<span class="cost" title="${esc(caseCostTitle(c.cost))}">${esc(costText(c.cost.total, 'cost_usd'))}</span>` : ''}</div>
+            <div class="sub" title="${esc(c.input)}">“${esc(c.input)}”</div></div></div>`;
+        }).join(''));
+    }).join('');
+  }
+  document.querySelectorAll('#caselist .grp').forEach((el) => {
+    const toggle = () => {
+      const id = el.dataset.product;
+      if (collapsedProducts.has(id)) collapsedProducts.delete(id); else collapsedProducts.add(id);
+      saveCollapsed();
+      renderCaseList();
+    };
+    el.addEventListener('click', toggle);
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  });
+  document.querySelectorAll('#caselist .item').forEach((el) => el.addEventListener('click', () => go({ caseKey: el.dataset.key })));
+  const clr = $('clear-section');
+  if (clr) clr.addEventListener('click', () => go({ section: null, product: null }));
+}
+
+// ---------------------------------------------------------------- run tab: case panel (detail)
+const fmtVal = (v) => (typeof v === 'string' ? JSON.stringify(v) : JSON.stringify(v));
+function argChips(args) {
+  const entries = Object.entries(args || {});
+  if (!entries.length) return '<span class="muted">no arguments</span>';
+  return '<div class="args">' + entries.map(([k, v]) => `<span class="arg"><b>${esc(k)}=</b>${esc(fmtVal(v))}</span>`).join('') + '</div>';
+}
+
+function idChips(returned, expected, forbidden) {
+  const hit = (id, pats) => pats.some((pt) => matchesRef(id, pt));
+  const chips = returned.map((id, i) => {
+    const cls = hit(id, forbidden) ? 'bad' : hit(id, expected) ? 'ok' : '';
+    const tip = cls === 'bad' ? 'forbidden result' : cls === 'ok' ? 'expected result' : 'extra result';
+    return `<span class="chip ${cls}" title="${tip}">${i + 1}. ${esc(id)}</span>`;
+  });
+  expected.filter((pt) => !returned.some((id) => matchesRef(id, pt)))
+    .forEach((pt) => chips.push(`<span class="chip bad" title="expected but not returned">missing ${esc(pt)}</span>`));
+  if (!chips.length) chips.push('<span class="muted">no results</span>');
+  return chips.join('');
+}
+
+function rowHtml([name, m]) {
+  const help = METRIC_HELP[name];
+  return `<div class="row ${m.success ? 'ok' : 'bad'}">
+    <span class="ico ${m.success ? 'ok' : 'bad'}">${m.success ? '✓' : '✗'}</span>
+    <div class="lbl" title="${esc(name)}">${esc(labelOf(name))}${!m.success && help ? `<div class="help">${esc(help)}</div>` : ''}</div>
+    <div class="score"><span class="bar ${m.success ? 'ok' : 'bad'}"><i style="width:${Math.round(m.score * 100)}%"></i></span>${m.score.toFixed(2)}
+      <span class="muted" title="pass threshold">/ ${esc(m.threshold)}</span></div>
+    <div class="reason">${esc(m.reason)}</div></div>`;
+}
+
+function checksHtml(c) {
+  const names = Object.keys(c.metrics);
+  return sectionNames(names).map((sec) => {
+    const rows = names.filter((n) => sectionOf(n) === sec).map((n) => [n, c.metrics[n]])
+      .sort((a, b) => Number(a[1].success) - Number(b[1].success));      // failures first
+    const bad = rows.filter(([, m]) => !m.success).length;
+    return `<details class="chk" ${bad ? 'open' : ''}><summary>
+      <span class="sname">${esc(sec)}</span>
+      <span class="pill ${bad ? 'fail' : 'pass'}">${rows.length - bad}/${rows.length} passed</span>
+      <span class="sdesc">${esc(SECTION_DESC[sec])}</span></summary>
+      <div class="rows">${rows.map(rowHtml).join('')}</div></details>`;
+  }).join('');
+}
+
+function searchHtml(c) {
+  const agent = c.agent;
+  const calls = agent && agent.tool_calls ? agent.tool_calls : [];
+  const secs = agent && agent.duration_ms ? ` · ${(agent.duration_ms / 1000).toFixed(1)} s` : '';
+  const legend = (c.expected_ids.length ? `Expected: ${c.expected_ids.map((i) => `<code>${esc(i)}</code>`).join(' ')}` : 'Expected: no results') +
+    (c.forbidden_ids.length ? ` · Must not appear: ${c.forbidden_ids.map((i) => `<code>${esc(i)}</code>`).join(' ')}` : '');
+  return `<div class="cmp">
+      <div><div class="who">Golden · fixed call · ${c.latency_ms.toFixed(1)} ms</div>
+        ${argChips(c.arguments)}
+        <div class="sub2">Returned</div>${idChips(c.returned_ids, c.expected_ids, c.forbidden_ids)}</div>
+      <div><div class="who">Agent · what it chose${secs}</div>
+        ${calls.length ? calls.map((t) => `<div style="margin-bottom:6px"><code>${esc(t.name)}</code>${argChips(t.arguments)}</div>`).join('') : '<span class="muted">no tool call</span>'}
+        <div class="sub2">Returned</div>${agent ? idChips(agent.returned_ids || [], c.expected_ids, c.forbidden_ids) : '<span class="muted">–</span>'}</div>
+    </div>
+    <div class="hint">${legend}. Green = expected, red = forbidden or missing.</div>`;
+}
+
+function productTable(output) {
+  const rows = (output && Array.isArray(output.results)) ? output.results : null;
+  if (!rows) return '';
+  if (!rows.length) return '<div class="muted">0 results</div>';
+  const head = `<div class="muted">${rows.length} of ${esc(output.total_matches ?? '?')} matches</div>`;
+  if (rows[0].doc !== undefined) {           // documentation search results
+    return head + '<table><thead><tr><th>doc › section</th><th>text</th><th>score</th></tr></thead><tbody>' +
+      rows.map((r) => `<tr><td><code>${esc(r.id)}</code></td><td>${esc(r.text)}</td><td>${esc(r.score)}</td></tr>`).join('') + '</tbody></table>';
+  }
+  return head + `<table><thead><tr><th>id</th><th>name</th><th>category</th><th>price</th><th>score</th></tr></thead><tbody>` +   // older (catalog) runs
+    rows.map((r) => `<tr><td><code>${esc(r.id)}</code></td><td>${esc(r.name)}</td><td>${esc(r.category)}</td>
+      <td>${esc(r.price)}</td><td>${esc(r.score)}</td></tr>`).join('') + '</tbody></table>';
+}
+
+function referenceHtml(c) {
+  if (!c.reference_answer && !(c.must_include && c.must_include.length)) return '';
+  return `<div class="refbox"><div class="who">Reference (from the golden)</div>
+    ${c.reference_answer ? `<div class="txt">${esc(c.reference_answer)}</div>` : ''}
+    ${c.must_include && c.must_include.length ? `<div style="margin-top:6px"><span class="muted">Must include</span> ${c.must_include.map((f) => `<span class="chip">${esc(f)}</span>`).join('')}</div>` : ''}</div>`;
+}
+
+function flowHtml(c) {
+  const flow = c.agent && c.agent.flow;
+  if (!flow || !flow.length) return '<div class="muted">No agent run for this case (LLM judge was off, or the run predates it).</div>' + referenceHtml(c);
+  return '<div class="flow">' + flow.map((st) => {
+    if (st.type === 'user') return `<div class="step user"><div class="who">Customer</div><div class="txt">${esc(st.text)}</div></div>`;
+    if (st.type === 'assistant') return `<div class="step assistant"><div class="who">Assistant</div><div class="txt">${esc(st.text)}</div></div>`;
+    if (st.type === 'error') return `<div class="step error"><div class="who">Error</div><div class="txt">${esc(st.text)}</div></div>`;
+    const out = st.output === null || st.output === undefined ? '<div class="muted">no response captured</div>'
+      : (productTable(st.output) || '') + `<details><summary>raw response</summary><pre>${esc(JSON.stringify(st.output, null, 2))}</pre></details>`;
+    return `<div class="step tool"><div class="who">Tool call · ${esc(st.server ? st.server + ' / ' : '')}${esc(st.name)} · ${esc(st.status)}</div>
+      ${argChips(st.arguments)}
+      <div class="who" style="margin-top:10px">MCP response</div>${out}</div>`;
+  }).join('') + '</div>' + referenceHtml(c);
+}
+
+function renderCasePanel() {
+  const { run, prev } = current;
+  const c = run.cases.find((x) => caseKey(x) === state.caseKey);
+  if (!c) {
+    $('casepanel').innerHTML = '<div class="none muted">Select a case on the left.</div>';
+    return;
+  }
+  const change = changeOf(c, prev);
+  const all = Object.values(c.metrics);
+  const bad = all.filter((m) => !m.success).length;
+  const hasFlow = !!(c.agent && c.agent.flow && c.agent.flow.length);
+  const hasCost = !!(c.cost && c.cost.total);
+  if ((state.view === 'conversation' && !hasFlow) || (state.view === 'cost' && !hasCost)) state.view = 'checks';
+  const meta = [c.id, c.product_name || pinfo(prodOf(c)).name,
+    bad ? `${bad} of ${all.length} checks failed` : `${all.length} checks passed`];
+  if (change) meta.push(change);
+  const tabs = [['checks', 'Checks'], ['conversation', 'Conversation'], ['search', 'Search comparison'], ['cost', 'Cost']];
+  const body = state.view === 'conversation' ? flowHtml(c) : state.view === 'search' ? searchHtml(c) : state.view === 'cost' ? caseCostHtml(c) : checksHtml(c);
+  const tabOff = (v) => (v === 'conversation' && !hasFlow ? 'disabled title="No agent run for this case"'
+    : v === 'cost' && !hasCost ? 'disabled title="No model or cost data for this case"' : '');
+  $('casepanel').innerHTML = `
+    <div class="casehead">
+      <h3>“${esc(c.input)}”</h3>
+      <div class="case-meta">${meta.map((x) => `<span>${esc(x)}</span>`).join('')}</div>
+    </div>
+    ${c.error ? `<div class="banner warn" style="margin-top:12px"><b>Tool call failed:</b> <code>${esc(c.error)}</code></div>` : ''}
+    <div class="tabs">${tabs.map(([v, l]) =>
+      `<button data-view="${v}" class="${state.view === v ? 'active' : ''}" ${tabOff(v)}>${l}</button>`).join('')}</div>
+    <div>${body}</div>`;
+  document.querySelectorAll('#casepanel .tabs button').forEach((b) => b.addEventListener('click', () => go({ view: b.dataset.view })));
+}
+
+// ---------------------------------------------------------------- run tab: orchestration
+async function renderRun() {
+  if (!state.runId || !runById(state.runId)) state.runId = allRuns[allRuns.length - 1].id;
+  const idx = allRuns.findIndex((r) => r.id === state.runId);
+  const [run, prev] = await Promise.all([fullRun(state.runId), idx > 0 ? fullRun(allRuns[idx - 1].id) : null]);
+  current = { run, prev };
+  renderRunBar(run);
+  renderBanners(run);
+  renderScorecard(run);
+  // keep a valid selection: default to the first failing case, else the first one
+  const flat = orderedCases(run, prev).flatMap((g) => g.cases);
+  if (!flat.some((c) => caseKey(c) === state.caseKey)) {
+    const first = flat.find((c) => !c.passed) || flat[0];
+    state.caseKey = first ? caseKey(first) : null;
+    writeHash(false);
+  }
+  renderCaseList();
+  renderCasePanel();
+}
+
+function moveSelection(delta) {
+  const { run, prev } = current;
+  if (!run) return;
+  const flat = orderedCases(run, prev).filter((g) => !isCollapsed(g.id)).flatMap((g) => g.cases);
+  if (!flat.length) return;
+  const i = flat.findIndex((c) => caseKey(c) === state.caseKey);
+  const next = flat[Math.min(Math.max(i + delta, 0), flat.length - 1)];
+  go({ caseKey: caseKey(next) }).then(() => {
+    const el = document.querySelector('#caselist .item.sel');
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  });
+}
+
+// ---------------------------------------------------------------- boot
+async function renderAll() {
+  const has = allRuns.length > 0;
+  $('empty').hidden = has;
+  $('view-overview').hidden = !has || state.tab !== 'overview';
+  $('view-run').hidden = !has || state.tab !== 'run';
+  document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.tab === state.tab));
+  if (!has) { $('subtitle').textContent = 'no runs yet'; return; }
+  const cur = allRuns[allRuns.length - 1];
+  $('subtitle').textContent = `${allRuns.length} run${allRuns.length === 1 ? '' : 's'} · latest ${fmtTime(cur.timestamp)}`;
+  if (state.tab === 'overview') {
+    renderKpis(); renderHistory();
+    await renderProducts();
+  } else {
+    await renderRun();
+  }
+}
+
+async function load() {
+  try {
+    allRuns = await api('/api/runs');
+  } catch (e) {
+    $('subtitle').textContent = 'failed to load runs: ' + e.message;
+    return;
+  }
+  buildProducts();
+  readHash();
+  await renderAll();
+}
+
+document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => go({ tab: b.dataset.tab }, true)));
+$('scorecard').addEventListener('click', (e) => {
+  const cell = e.target.closest('[data-sec]');
+  if (cell && $('scorecard').contains(cell)) {
+    const product = cell.dataset.product || null;
+    const section = cell.dataset.sec;
+    const same = state.section === section && (state.product || null) === product;
+    go(same ? { section: null, product: null } : { section, product });
+    return;
+  }
+  const name = e.target.closest('[data-pick]');
+  if (name && $('scorecard').contains(name)) {
+    const product = name.dataset.pick || null;
+    go({ product: state.product === product && !state.section ? null : product, section: null });
+  }
+});
+$('refresh').addEventListener('click', load);
+let pqTimer;
+$('product-q').addEventListener('input', (e) => {
+  clearTimeout(pqTimer);
+  const v = e.target.value;
+  pqTimer = setTimeout(() => { state.productQ = v; renderProducts(); $('product-q').focus(); }, 150);
+});
+
+// ---- destructive actions: one confirmation dialog, used for "clear all" (type "delete") and "delete one run"
+const clearDialog = $('clear-dialog');
+let pendingAction = null;
+function confirmDialog({ title, html, button, typed, action }) {
+  pendingAction = action;
+  $('clear-title').textContent = title;
+  $('clear-text').innerHTML = html;
+  $('clear-confirm').textContent = button;
+  $('clear-typed').hidden = !typed;
+  $('clear-input').value = '';
+  $('clear-confirm').disabled = !!typed;
+  $('clear-error').hidden = true;
+  clearDialog.showModal();
+  if (typed) $('clear-input').focus(); else $('clear-cancel').focus();
+}
+async function deleteRequest(url, init) {
+  const res = await fetch(url, init);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || res.status);
+}
+$('clear-open').addEventListener('click', () => confirmDialog({
+  title: 'Clear all history?',
+  html: `This permanently deletes <b>${allRuns.length}</b> stored run file(s) from <code>results/runs/</code>. It cannot be undone.`,
+  button: 'Delete all runs', typed: true,
+  action: async () => {
+    await deleteRequest('/api/runs/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'delete' }) });
+    state.runId = null;
+  },
+}));
+function askDeleteRun(id) {
+  const r = runById(id);
+  if (!r) return;
+  confirmDialog({
+    title: `Delete run #${runNumber(r)}?`,
+    html: `<b>#${runNumber(r)}</b> · ${esc(fmtTime(r.timestamp))} · ${pct(r.summary.pass_rate)} passed.<br>The run file is permanently deleted. Other runs are renumbered.`,
+    button: 'Delete run', typed: false,
+    action: async () => {
+      await deleteRequest('/api/runs/' + encodeURIComponent(id), { method: 'DELETE', headers: { 'X-Confirm': 'delete' } });
+      if (state.runId === id) state.runId = null;
+    },
+  });
+}
+$('clear-input').addEventListener('input', (e) => { $('clear-confirm').disabled = e.target.value.trim().toLowerCase() !== 'delete'; });
+$('clear-input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('clear-confirm').disabled) $('clear-confirm').click(); });
+$('clear-cancel').addEventListener('click', () => clearDialog.close());
+$('clear-confirm').addEventListener('click', async () => {
+  $('clear-confirm').disabled = true;
+  try {
+    await pendingAction();
+    for (const k of Object.keys(fullRunCache)) delete fullRunCache[k];
+    clearDialog.close();
+    state.caseKey = null;
+    await load();
+  } catch (e) {
+    $('clear-error').textContent = 'Failed: ' + e.message;
+    $('clear-error').hidden = false;
+    $('clear-confirm').disabled = false;
+  }
+});
+$('range').addEventListener('change', () => { if (allRuns.length) { renderProducts(); renderHistory(); } });
+$('run-select').addEventListener('change', (e) => go({ runId: e.target.value, caseKey: null }, true));
+$('run-prev').addEventListener('click', () => { const i = allRuns.findIndex((r) => r.id === state.runId); if (i > 0) go({ runId: allRuns[i - 1].id, caseKey: null }, true); });
+$('run-next').addEventListener('click', () => { const i = allRuns.findIndex((r) => r.id === state.runId); if (i < allRuns.length - 1) go({ runId: allRuns[i + 1].id, caseKey: null }, true); });
+let qTimer;
+$('case-q').addEventListener('input', (e) => {
+  clearTimeout(qTimer);
+  const v = e.target.value;
+  qTimer = setTimeout(() => { state.q = v; writeHash(false); renderRun().then(() => { $('case-q').focus(); }); }, 200);
+});
+window.addEventListener('popstate', async () => { readHash(); await renderAll(); });
+window.addEventListener('keydown', (e) => {
+  if (state.tab !== 'run' || /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+  if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); moveSelection(1); }
+  if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); moveSelection(-1); }
+  const view = { 1: 'checks', 2: 'conversation', 3: 'search', 4: 'cost' }[e.key];
+  if (view) go({ view });
+});
+load();
+</script>
+</body>
+</html>
