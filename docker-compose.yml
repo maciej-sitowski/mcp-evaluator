@@ -32,6 +32,7 @@ services:
       PRODUCTS_DIR: ${PRODUCTS_DIR:-}
       RESULTS_DIR: /results
       RUN_LABEL: ${RUN_LABEL:-}
+      RUN_PARAMS: ${RUN_PARAMS:-}  # JSON object; replaces RUN_PARAMS in evals/run_evals.py for this run
       PRODUCT: ${PRODUCT:-}  # PRODUCT=product-two[,product-one] runs only those products
       CASE: ${CASE:-}
       LATENCY_THRESHOLD_MS: ${LATENCY_THRESHOLD_MS:-500}

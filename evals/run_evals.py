@@ -31,6 +31,15 @@ JUDGE_MODEL = None
 # docker-compose.yml as well.
 PRODUCTS_DIR = "products"
 
+# What you changed for this run. Stored on the run file and shown in the history table, so a score
+# change can be matched to the change that produced it. Keys and values are yours; leave the dict
+# empty to store nothing. Override for one run with --param key=value (repeatable), or replace the
+# whole dict with RUN_PARAMS='{"search": "v2", "change": "shorter prompt"}'.
+RUN_PARAMS = {
+    # "search": "v1",
+    # "change": "baseline",
+}
+
 # LLM cost (shown per run and per case in the dashboard). A call is priced from the credits the provider
 # reports (GitHub Copilot) or, failing that, from its tokens times PRICING (Cursor reports tokens only).
 # Both are API list prices: what you are really charged depends on your plan's allowance and discounts.
@@ -306,7 +315,8 @@ def print_report(run: Dict[str, Any]) -> None:
         print("%-14s %-28s %-6s %s" % (c["product"], c["id"], "PASS" if c["passed"] else "FAIL", ", ".join(failed)))
     s = run["summary"]
     print("-" * 90)
-    print("Run %s | engine=%s | label=%r" % (run["id"], run["engine"], run["label"]))
+    params = " | " + " ".join("%s=%s" % kv for kv in run["params"].items()) if run.get("params") else ""
+    print("Run %s | engine=%s | label=%r%s" % (run["id"], run["engine"], run["label"], params))
     print("Cases passed: %d/%d (%.0f%%)" % (s["cases_passed"], s["cases_total"], s["pass_rate"] * 100))
     for pid, p in s["products"].items():
         print("  %-14s %d/%d passed%s" % (
@@ -368,6 +378,7 @@ async def run(args: argparse.Namespace) -> int:
         "id": now.strftime("%Y%m%dT%H%M%SZ"),
         "timestamp": now.isoformat(timespec="seconds"),
         "label": args.label,
+        "params": resolve_run_params(args),
         "engine": detect_engine(args.mcp_url),
         "mcp_url": args.mcp_url,
         "tools": tools,
@@ -434,6 +445,42 @@ def setup_llm(args: argparse.Namespace, headers: Dict[str, str]):
     )
 
 
+def resolve_run_params(args: argparse.Namespace) -> Dict[str, str]:
+    """RUN_PARAMS from CONFIG, replaced by $RUN_PARAMS when set, then each --param key=value on top."""
+    raw = (os.environ.get("RUN_PARAMS") or "").strip()
+    if raw:
+        try:
+            base = json.loads(raw)
+        except ValueError as exc:
+            raise SystemExit("RUN_PARAMS must be a JSON object, e.g. {\"search\": \"v2\"} (%s)" % exc)
+        if not isinstance(base, dict):
+            raise SystemExit("RUN_PARAMS must be a JSON object, got %s" % type(base).__name__)
+    else:
+        base = dict(RUN_PARAMS)
+    for item in args.param:
+        key, sep, value = item.partition("=")
+        key = key.strip()
+        if not sep or not key:
+            raise SystemExit("--param must look like 'key=value', got %r" % item)
+        base[key] = value.strip()
+    out: Dict[str, str] = {}
+    for key, value in base.items():
+        name = str(key).strip()
+        if not name or value is None:
+            continue
+        if isinstance(value, str):
+            text = value.strip()
+        elif isinstance(value, bool):
+            text = "true" if value else "false"
+        elif isinstance(value, (int, float)):
+            text = str(value)
+        else:
+            text = json.dumps(value)
+        if text:
+            out[name] = text
+    return out
+
+
 def detect_engine(mcp_url: str) -> str:
     """Which search engine the mock server is running (reported by its /health route)."""
     parsed = urlparse(mcp_url)
@@ -457,6 +504,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--results-dir", default=os.environ.get("RESULTS_DIR", "/results"))
     p.add_argument("--products-dir", default=default_products_dir())
     p.add_argument("--label", default=os.environ.get("RUN_LABEL", ""), help="free-text note stored in the run file")
+    p.add_argument("--param", action="append", default=[], metavar="key=value",
+                   help="parameter stored with this run and shown in the history table (repeatable). "
+                        "RUN_PARAMS='{\"k\": \"v\"}' replaces the RUN_PARAMS dict in the CONFIG section.")
     p.add_argument("--product", dest="products", action="append", default=_env_list("PRODUCT"), metavar="ID",
                    help="only run this product id (repeatable; or PRODUCT=id1,id2)")
     p.add_argument("--case", dest="cases", action="append", default=_env_list("CASE"), metavar="ID",

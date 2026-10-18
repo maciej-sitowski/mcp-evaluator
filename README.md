@@ -33,7 +33,7 @@ Without a key, step 2 is skipped and the run says so.
 
 **mcp-server** indexes `products/*/docs/*.md` on each search. `SEARCH_ENGINE=v1` is exact keywords. `v2` adds stemming, synonyms, and typo tolerance. Restart it after server code changes. Doc edits need no restart.
 
-**evals** waits until the server is healthy, then runs. It mounts `products/` and writes `results/`. The agent and the judge are chosen in the CONFIG block at the top of `evals/run_evals.py`. A flag or an environment variable overrides that for one run. Secrets live in `.env` (see `.env.example`).
+**evals** waits until the server is healthy, then runs. It mounts `products/` and writes `results/`. The agent and the judge are chosen in the CONFIG block at the top of `evals/run_evals.py`. A flag or an environment variable overrides that for one run. `RUN_PARAMS` in that block is stored on the run and shown in the history table, so a score can be matched to the change that produced it. Secrets live in `.env` (see `.env.example`).
 
 **dashboard** serves the page and `/api/runs`. It mounts the same `results/` folder, so a new file shows up on refresh. It can also delete runs.
 
@@ -50,6 +50,7 @@ Open http://localhost:8080.
 docker compose run --rm evals --no-llm                 # step 1 only
 docker compose run --rm evals --strict                 # exit 1 if a case fails
 docker compose run --rm evals --product billing --case pro-plan-price
+docker compose run --rm evals --param change="shorter prompt"
 AGENT_PROVIDER=copilot docker compose run --rm evals
 ```
 
