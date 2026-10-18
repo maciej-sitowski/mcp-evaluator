@@ -1,0 +1,27 @@
+{
+  "goldens": [
+    {
+      "id": "check-interval",
+      "input": "How often does Product Two check my website?",
+      "arguments": { "query": "check interval" },
+      "expected_docs": ["alerts.md#alert-thresholds"],
+      "reference_answer": "Every 60 seconds by default; the Business plan allows an interval as fast as 10 seconds.",
+      "must_include": ["60 seconds", "10 seconds"]
+    },
+    {
+      "id": "connect-slack",
+      "input": "How do I connect Slack?",
+      "arguments": { "query": "connect slack" },
+      "expected_docs": ["integrations.md#slack"],
+      "reference_answer": "Open Settings → Integrations → Slack and choose a channel.",
+      "must_include": ["Integrations", "channel"]
+    },
+    {
+      "id": "pdf-export-not-covered",
+      "input": "Can I export my notes to PDF?",
+      "arguments": { "query": "export notes pdf" },
+      "expected_docs": [],
+      "reference_answer": "The Product Two documentation does not cover exporting notes, so it cannot be confirmed."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "goldens": [
+    {
+      "id": "message-history-free",
+      "input": "How long are messages kept on the free plan?",
+      "arguments": { "query": "message history free" },
+      "expected_docs": ["channels.md#message-history"],
+      "reference_answer": "Free workspaces keep the last 90 days of messages.",
+      "must_include": ["90 days"]
+    },
+    {
+      "id": "require-2fa",
+      "input": "Can I require two-factor authentication for everyone?",
+      "arguments": { "query": "two-factor authentication" },
+      "expected_docs": ["security.md#two-factor-authentication"],
+      "reference_answer": "Yes. Admins can require two-factor authentication for the whole workspace.",
+      "must_include": ["admin"]
+    },
+    {
+      "id": "voice-calls-not-covered",
+      "input": "Does Product Three support voice calls?",
+      "arguments": { "query": "voice calls" },
+      "expected_docs": [],
+      "reference_answer": "The Product Three documentation does not cover voice calls, so it cannot be confirmed."
+    }
+  ]
+}

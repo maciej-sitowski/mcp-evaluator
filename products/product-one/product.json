@@ -1,0 +1,7 @@
+{
+  "name": "Product One",
+  "description": "Placeholder documentation (a note-taking app). Replace docs/ and goldens/ with your own.",
+  "color": "#6ea8fe",
+  "tool": "search_docs",
+  "default_arguments": { "product": "product-one" }
+}

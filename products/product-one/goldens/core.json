@@ -1,0 +1,27 @@
+{
+  "goldens": [
+    {
+      "id": "restore-deleted-note",
+      "input": "How long can I restore a deleted note?",
+      "arguments": { "query": "restore deleted note" },
+      "expected_docs": ["sync-and-backup.md#backups"],
+      "reference_answer": "Admins can restore a deleted note from the Trash within 30 days.",
+      "must_include": ["30 days"]
+    },
+    {
+      "id": "pro-plan-price",
+      "input": "How much does the Pro plan cost?",
+      "arguments": { "query": "pro plan price" },
+      "expected_docs": ["pricing.md#plans"],
+      "reference_answer": "Pro costs $8 per user per month and includes unlimited notes.",
+      "must_include": ["$8"]
+    },
+    {
+      "id": "sms-alerts-not-covered",
+      "input": "Does Product One support SMS alerts?",
+      "arguments": { "query": "sms alerts" },
+      "expected_docs": [],
+      "reference_answer": "The Product One documentation does not mention SMS alerts, so it cannot be confirmed."
+    }
+  ]
+}

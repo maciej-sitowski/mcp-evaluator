@@ -1,0 +1,27 @@
+{
+  "goldens": [
+    {
+      "id": "forgot-master-password",
+      "input": "I forgot my master password, what can I do?",
+      "arguments": { "query": "master password reset" },
+      "expected_docs": ["recovery.md#master-password"],
+      "reference_answer": "The master password cannot be reset; use your recovery key to regain access.",
+      "must_include": ["recovery key"]
+    },
+    {
+      "id": "family-plan-users",
+      "input": "How many users does the Family plan include and what does it cost?",
+      "arguments": { "query": "family plan" },
+      "expected_docs": ["pricing.md#plans"],
+      "reference_answer": "The Family plan costs $5 per month and covers up to 6 users.",
+      "must_include": ["$5", "6 users"]
+    },
+    {
+      "id": "browser-extension-not-covered",
+      "input": "Is there a Safari browser extension?",
+      "arguments": { "query": "safari extension" },
+      "expected_docs": [],
+      "reference_answer": "The Product Four documentation does not cover browser extensions, so it cannot be confirmed."
+    }
+  ]
+}
