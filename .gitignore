@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.deepeval/
+.env
+results/runs/*.tmp
+results/runs/*.json

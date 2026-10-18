@@ -1,0 +1,64 @@
+services:
+  # The MCP server under test. Endpoint: http://localhost:8000/mcp
+  mcp-server:
+    build: ./mcp_server
+    environment:
+      # v1 = basic keyword search, v2 = stemming + synonyms + typo tolerance
+      SEARCH_ENGINE: ${SEARCH_ENGINE:-v1}
+      PRODUCTS_DIR: /products
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./mcp_server:/app # edit code, then `docker compose restart mcp-server`
+      - ./products:/products:ro # docs are re-read on every search, no restart needed
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  # On-demand eval run:  docker compose run --rm evals
+  evals:
+    build: ./evals
+    profiles: ["eval"]
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+    environment:
+      # Point at your real MCP instead of the mock: MCP_URL=https://your-host/mcp MCP_AUTH_HEADER="Bearer ..."
+      # and run with --no-deps (see README). A server on this machine is reachable as host.docker.internal.
+      MCP_URL: ${MCP_URL:-http://mcp-server:8000/mcp}
+      MCP_AUTH_HEADER: ${MCP_AUTH_HEADER:-}
+      PRODUCTS_DIR: ${PRODUCTS_DIR:-}
+      RESULTS_DIR: /results
+      RUN_LABEL: ${RUN_LABEL:-}
+      PRODUCT: ${PRODUCT:-}  # PRODUCT=product-two[,product-one] runs only those products
+      CASE: ${CASE:-}
+      LATENCY_THRESHOLD_MS: ${LATENCY_THRESHOLD_MS:-500}
+      # Optional: enables the agent + LLM-as-a-judge metrics. Without a key they are skipped.
+      # Agent / judge / models / products are configured in evals/run_evals.py (CONFIG section);
+      # these only override it for a single run, e.g. AGENT_PROVIDER=copilot docker compose run --rm evals
+      AGENT_PROVIDER: ${AGENT_PROVIDER:-}
+      JUDGE_PROVIDER: ${JUDGE_PROVIDER:-}
+      CURSOR_API_KEY: ${CURSOR_API_KEY:-}
+      COPILOT_GITHUB_TOKEN: ${COPILOT_GITHUB_TOKEN:-}
+      AGENT_MODEL: ${AGENT_MODEL:-}
+      JUDGE_MODEL: ${JUDGE_MODEL:-}
+      DEEPEVAL_TELEMETRY_OPT_OUT: "YES"
+    volumes:
+      - ./evals:/app
+      - ./products:/products:ro
+      - ./results:/results
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Results dashboard: http://localhost:8080
+  dashboard:
+    build: ./dashboard
+    environment:
+      RESULTS_DIR: /results
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dashboard:/app:ro
+      - ./results:/results   # writable: the dashboard can clear the run history

@@ -1,0 +1,4 @@
+deepeval>=3.0
+mcp>=1.10,<2
+cursor-sdk>=1.0
+github-copilot-sdk>=1.0
