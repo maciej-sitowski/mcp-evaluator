@@ -325,7 +325,7 @@
 
   <!-- ============================== OVERVIEW ============================== -->
   <div id="view-overview" hidden style="display:contents">
-    <!-- Part 1: the latest run only (compared with the run before it) -->
+    <!-- Part 1: the latest run on its own. Runs are not compared: each one may cover different products and cases. -->
     <div class="section-head">
       <h3>Latest run <span class="muted" id="latest-info"></span></h3>
       <button id="latest-open">Open details →</button>
@@ -553,32 +553,22 @@ async function go(patch, push = false) {
 }
 
 // ---------------------------------------------------------------- overview: KPIs
-function deltaHtml(curr, prev, { higherIsBetter = true, fmt = (x) => x, unit = '' } = {}) {
-  if (prev === undefined || prev === null || curr === undefined || curr === null) return '<span class="delta">first run</span>';
-  const d = curr - prev;
-  if (Math.abs(d) < 1e-9) return '<span class="delta">no change vs previous run</span>';
-  const good = (d > 0) === higherIsBetter;
-  return `<span class="delta ${good ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${fmt(Math.abs(d))}${unit} vs previous run</span>`;
-}
-
+// Each run stands alone. A later run may cover different products, cases, or the judge, so a delta against the previous file would not mean the search got better or worse.
 function renderKpis() {
   const cur = allRuns[allRuns.length - 1];
-  const prev = allRuns[allRuns.length - 2];
-  const s = cur.summary, p = prev && prev.summary;
+  const s = cur.summary;
   const cards = [
-    ['Pass rate', pct(s.pass_rate), deltaHtml(s.pass_rate * 100, p && p.pass_rate * 100, { fmt: (x) => x.toFixed(0), unit: ' pp' }),
-      `${s.cases_passed} of ${s.cases_total} cases`],
+    ['Pass rate', pct(s.pass_rate), `${s.cases_passed} of ${s.cases_total} cases`],
   ];
   LLM_GROUPS.forEach((g) => {
     const v = groupAvg(s, g);
-    if (v !== null) cards.push([g + ' (avg)', v.toFixed(2), deltaHtml(v, p ? groupAvg(p, g) : null, { fmt: (x) => x.toFixed(2) })]);
+    if (v !== null) cards.push([g + ' (avg)', v.toFixed(2), '']);
   });
-  cards.push(['Latency p95', s.latency_ms.p95.toFixed(1) + ' ms',
-    deltaHtml(s.latency_ms.p95, p && p.latency_ms.p95, { higherIsBetter: false, fmt: (x) => x.toFixed(1), unit: ' ms' })]);
-  $('latest-info').textContent = `· #${allRuns.length} · ${fmtTime(cur.timestamp)} · deltas vs previous run`;
+  cards.push(['Latency p95', s.latency_ms.p95.toFixed(1) + ' ms', '']);
+  $('latest-info').textContent = `· #${allRuns.length} · ${fmtTime(cur.timestamp)}`;
   $('latest-open').onclick = () => go({ tab: 'run', runId: cur.id, caseKey: null, status: 'all', section: null, product: null, q: '' }, true);
-  $('kpis').innerHTML = cards.map(([label, value, delta, note]) =>
-    `<div class="card kpi"><div class="label">${esc(label)}${note ? ` · ${esc(note)}` : ''}</div><div class="value">${esc(value)}</div>${delta}</div>`).join('');
+  $('kpis').innerHTML = cards.map(([label, value, note]) =>
+    `<div class="card kpi"><div class="label">${esc(label)}${note ? ` · ${esc(note)}` : ''}</div><div class="value">${esc(value)}</div></div>`).join('');
 }
 
 // ---------------------------------------------------------------- overview: by product
@@ -635,7 +625,7 @@ function groupThreshold(fullRunWithCases, group) {
 }
 
 async function renderProducts() {
-  const cur = allRuns[allRuns.length - 1], prev = allRuns[allRuns.length - 2];
+  const cur = allRuns[allRuns.length - 1];
   const all = Object.keys(cur.summary.products || {});
   $('products-head').hidden = $('products-card').hidden = !all.length;
   if (!all.length) return;
@@ -667,10 +657,6 @@ async function renderProducts() {
 
   $('products').innerHTML = ids.map((id) => {
     const p = cur.summary.products[id];
-    const before = prev && prev.summary.products && prev.summary.products[id];
-    const d = before ? (p.pass_rate - before.pass_rate) * 100 : null;
-    const delta = d === null ? '<span class="muted">new</span>' : Math.abs(d) < 0.5 ? '<span class="muted">no change</span>'
-      : `<span class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(0)} pp vs previous run</span>`;
     const ok = p.pass_rate >= 0.999;
     const folded = collapsedOverviewProducts.has(id);
     const sections = SECTION_ORDER.filter((sec) => sec !== 'Other' && runs.some((r) => sectionAvg(r.summary.products && r.summary.products[id], sec) !== null));
@@ -695,7 +681,6 @@ async function renderProducts() {
           <div class="pacc-rate"><span class="bar ${ok ? 'ok' : 'bad'}"><i style="width:${Math.round(p.pass_rate * 100)}%"></i></span>
             <b>${pct(p.pass_rate)}</b><span class="muted">${p.cases_passed}/${p.cases_total}</span></div>
           <span class="pacc-spacer"></span>
-          <span class="muted" style="font-size:12px">${delta}</span>
         </div>
         <button class="open-product" data-open="${esc(id)}">Open cases →</button>
       </div>
@@ -734,13 +719,7 @@ function renderHistory() {
     '<th>Correctness</th><th>Relevancy</th><th>Quality</th><th>p95 latency</th><th title="agent + judge, at API list prices">LLM cost</th><th></th>';
   $('history').innerHTML = runs.map((r) => {
     const idx = allRuns.indexOf(r);
-    const prev = allRuns[idx - 1];
     const s = r.summary;
-    let delta = '';
-    if (prev) {
-      const d = (s.pass_rate - prev.summary.pass_rate) * 100;
-      if (Math.abs(d) >= 0.5) delta = ` <span class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'}${Math.abs(d).toFixed(0)}pp</span>`;
-    }
     const g = (name) => { const v = groupAvg(s, name); return v === null ? '–' : v.toFixed(2); };
     const judge = judgeEnabled(r) ? '<span class="pill pass" title="agent + LLM judge metrics included">on</span>' : '<span class="pill info" title="deterministic metrics only">off</span>';
     const failing = ids.filter((id) => s.products && s.products[id] && s.products[id].pass_rate < 0.999);
@@ -753,7 +732,7 @@ function renderHistory() {
       ? `<span class="down" title="${esc(failing.map((id) => pinfo(id).name).join(', '))}">${failing.length} failing</span>` : '<span class="up">all pass</span>'}</td>` : '';
     return `<tr class="run-row" data-id="${esc(r.id)}">
       <td>${idx + 1}</td><td>${esc(fmtTime(r.timestamp))}</td><td>${judge}</td>
-      <td title="${s.cases_passed} of ${s.cases_total} cases passed"><b>${pct(s.pass_rate)}</b>${delta}</td>${prodCells}
+      <td title="${s.cases_passed} of ${s.cases_total} cases passed"><b>${pct(s.pass_rate)}</b></td>${prodCells}
       <td>${g('Correctness')}</td><td>${g('Relevancy')}</td><td>${g('Quality')}</td>
       <td>${s.latency_ms.p95.toFixed(1)} ms</td>
       <td title="${esc(costTitle(s.cost))}">${esc(costText(s.cost))}</td>
