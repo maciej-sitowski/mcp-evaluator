@@ -80,48 +80,22 @@
   .kpi .delta { font-size: 12px; color: var(--muted); }
   .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
   .card-head h2 { margin: 0; }
-  .filter-layouts { margin-bottom: 8px; }
-  .filter-blurb { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
-  .hist-filters { position: relative; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
-  .hist-filters.stack { display: block; }
-  .hist-filters:empty { display: none; margin: 0; }
-  .fchip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 4px 2px 10px;
-           font-size: 12px; font-weight: 600; background: #1b2a44; border: 1px solid var(--accent); }
-  .fchip b { font-weight: 650; }
-  .fchip button { background: transparent; border: 0; color: var(--muted); padding: 0 6px; font-size: 12px; }
-  .fchip button:hover { color: var(--text); border-color: transparent; }
-  .fchip button.widen { color: var(--accent); }
-  .pop-anchor, .query-wrap { position: relative; }
-  .query-wrap { flex: 1; min-width: 220px; max-width: 420px; }
-  .query-wrap input { width: 100%; }
+  .hist-filters { position: relative; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
+  .pop-anchor { position: relative; }
   .filter-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 20; width: 280px; padding: 12px;
                 background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
                 box-shadow: 0 16px 40px rgba(0,0,0,.45); }
-  .query-wrap .filter-pop { width: 100%; }
-  .filter-pop .flabel { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
-  .filter-pop input, .check-panel input { width: 100%; margin: 0 0 8px; padding: 6px 8px; font-size: 12px; }
-  .flist, .check-list { display: grid; gap: 2px; max-height: 240px; overflow: auto; }
-  .filter-pop button.frow-h, .filter-pop button.fback { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px;
+  .filter-pop input { width: 100%; margin: 0 0 8px; padding: 6px 8px; font-size: 12px; }
+  .flist { display: grid; gap: 2px; max-height: 240px; overflow: auto; }
+  .filter-pop button.frow-h { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px;
     background: transparent; border: 0; border-radius: 6px; padding: 6px 8px; text-align: left; font-weight: 550; }
-  .filter-pop button.fback { width: auto; color: var(--muted); padding: 0 0 8px; font-size: 12px; font-weight: 600; }
-  .filter-pop button.frow-h:hover, .filter-pop button.fback:hover { background: rgba(255,255,255,.05); border-color: transparent; color: var(--text); }
-  .filter-pop button.fback:hover { background: transparent; }
-  .fmeta { color: var(--muted); font-size: 12px; font-weight: 500; }
-  .fvals { max-height: 160px; overflow: auto; }
+  .filter-pop button.frow-h:hover { background: rgba(255,255,255,.05); border-color: transparent; color: var(--text); }
   .fempty { padding: 4px 8px 8px; font-size: 12px; }
   .fsel { display: inline-flex; align-items: center; gap: 6px; }
-  .fsel > span, .check-judge > span { color: var(--muted); font-size: 12px; font-weight: 600; }
-  .fsel select, .check-row select { font-size: 12px; padding: 2px 8px; max-width: 160px; }
+  .fsel > span { color: var(--muted); font-size: 12px; font-weight: 600; }
+  .fsel select { font-size: 12px; padding: 2px 8px; max-width: 160px; }
   .fsel .xbtn { background: transparent; border: 0; color: var(--muted); padding: 0 4px; }
   .fsel .xbtn:hover { color: var(--text); border-color: transparent; }
-  .check-panel { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--panel2); }
-  .check-judge { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-  .check-row { display: flex; align-items: center; gap: 8px; padding: 3px 2px; }
-  .check-row label { flex: 1; cursor: pointer; }
-  button.chip.hit { cursor: pointer; }
-  button.chip.hit.on { border-color: var(--accent); background: #1b2a44; }
-  button.pill.hit { cursor: pointer; border: 1px solid transparent; }
-  button.pill.hit.on { border-color: var(--accent); }
   td.hist-empty { text-align: center; color: var(--muted); padding: 18px 10px; }
   .seg { display: inline-flex; gap: 4px; flex-wrap: wrap; }
   .seg button { padding: 2px 10px; font-size: 12px; border-radius: 999px; color: var(--muted); }
@@ -446,10 +420,8 @@
     <section class="card">
       <div class="card-head">
         <h2>Run history</h2>
+        <div class="hist-filters" id="hist-filters"></div>
       </div>
-      <div class="seg filter-layouts" id="filter-layouts"></div>
-      <p class="filter-blurb" id="filter-blurb"></p>
-      <div class="hist-filters" id="hist-filters"></div>
       <div class="scroll">
         <table>
           <thead><tr id="history-head"></tr></thead>
@@ -586,21 +558,7 @@ const visibleRuns = () => { const n = +$('range').value; return n ? allRuns.slic
 const judgeEnabled = (r) => !!(r.llm_judge && r.llm_judge.enabled);
 // History-table filters. They narrow the rows only; the charts above still use the Show range.
 // params[key] === '' means the run must contain that parameter (any value). A string means that value.
-const LAYOUTS = [
-  { id: 'add', name: '1 · Add filter', blurb: 'Add a parameter, then choose any value or a specific one. Any value keeps only runs that include that parameter.' },
-  { id: 'selects', name: '2 · Selects', blurb: 'Adding a parameter drops runs that do not have it. The dropdown starts at any value; pick a value to narrow further.' },
-  { id: 'checks', name: '3 · Checklist', blurb: 'Check a parameter to keep only runs that contain it. Use the dropdown to require a specific value.' },
-  { id: 'click', name: '4 · Click chips', blurb: 'Click a parameter or the judge pill in the table. Widen an exact value to any value of that parameter from the bar.' },
-  { id: 'search', name: '5 · Search', blurb: 'Type a parameter or judge. Pick “runs with …” for any value, or “key = value” for one value.' },
-];
-function savedLayout() {
-  try {
-    const id = localStorage.getItem('histFilterLayout');
-    if (LAYOUTS.some((l) => l.id === id)) return id;
-  } catch { /* storage unavailable */ }
-  return 'add';
-}
-const histFilter = { judge: 'all', params: {}, layout: savedLayout(), open: false, openKey: null, paramQuery: '' };
+const histFilter = { judge: 'all', params: {}, open: false, paramQuery: '' };
 
 // ---- LLM cost. `cost` objects come from summary.cost / summary.products[id].cost (run level, per product)
 // or from a case's cost.total / cost.agent / cost.judge. null = the run had no LLM judge (or predates cost tracking).
@@ -826,15 +784,10 @@ function runParams(r) {
   const p = r && r.params && typeof r.params === 'object' && !Array.isArray(r.params) ? r.params : {};
   return Object.entries(p).filter(([k, v]) => String(k).trim() && v != null && String(v).trim() !== '');
 }
-function paramsHtml(r, clickable) {
+function paramsHtml(r) {
   const bits = [];
   if (r.label) bits.push(`<span class="chip">${esc(r.label)}</span>`);
-  for (const [k, v] of runParams(r)) {
-    const text = String(v);
-    const on = Object.prototype.hasOwnProperty.call(histFilter.params, k) && (histFilter.params[k] === '' || histFilter.params[k] === text);
-    if (clickable) bits.push(`<button type="button" class="chip hit${on ? ' on' : ''}" data-pkey="${esc(k)}" data-pval="${esc(text)}"><span class="k">${esc(k)}</span>${esc(text)}</button>`);
-    else bits.push(`<span class="chip"><span class="k">${esc(k)}</span>${esc(text)}</span>`);
-  }
+  for (const [k, v] of runParams(r)) bits.push(`<span class="chip"><span class="k">${esc(k)}</span>${esc(v)}</span>`);
   return bits.join('');
 }
 
@@ -845,7 +798,7 @@ function matchesHist(r) {
   return Object.entries(histFilter.params).every(([k, v]) => k in have && (!v || have[k] === v));
 }
 
-function PARAM_INDEX_START(pool) {
+function paramIndex(pool) {
   const values = {};
   const keys = [];
   pool.forEach((r) => runParams(r).forEach(([k, v]) => {
@@ -858,43 +811,31 @@ function PARAM_INDEX_START(pool) {
 
 function closeHistFilter() {
   histFilter.open = false;
-  histFilter.openKey = null;
   histFilter.paramQuery = '';
 }
+
+function hasParam(k) { return Object.prototype.hasOwnProperty.call(histFilter.params, k); }
 
 function renderHistFilters(pool) {
   const { keys, values } = paramIndex(pool);
   Object.keys(histFilter.params).forEach((k) => {
-    if (!values[k] || (histFilter.params[k] && !values[k].includes(histFilter.params[k]))) delete histFilter.params[k];
+    if (!values[k]) delete histFilter.params[k];
+    else if (histFilter.params[k] && !values[k].includes(histFilter.params[k])) histFilter.params[k] = '';
   });
-  if (histFilter.openKey && !keys.includes(histFilter.openKey)) histFilter.openKey = null;
   const qEl = $('hist-filter-q');
   const refocus = !!(qEl && document.activeElement === qEl);
   const caret = refocus ? qEl.selectionStart : null;
-  const chips = [];
-  if (histFilter.judge !== 'all') {
-    chips.push(`<button type="button" class="fchip" data-clear="judge">LLM judge <b>${esc(histFilter.judge)}</b><span class="x" aria-hidden="true">×</span></button>`);
-  }
-  Object.entries(histFilter.params).forEach(([k, v]) => {
-    if (!v) return;
-    chips.push(`<button type="button" class="fchip" data-clear-param="${esc(k)}">${esc(k)} <b>${esc(v)}</b><span class="x" aria-hidden="true">×</span></button>`);
-  });
-  const judge = ['any', 'on', 'off'].map((id) => {
-    const val = id === 'any' ? 'all' : id;
-    return `<button type="button" data-judge="${val}" class="${histFilter.judge === val ? 'active' : ''}">${id}</button>`;
-  }).join('');
-  const q = histFilter.paramQuery.trim().toLowerCase();
-  const shown = keys.filter((k) => !q || k.toLowerCase().includes(q));
-  const rows = shown.map((k) => {
+  const judgeOpts = ['all', 'on', 'off'].map((v) => `<option value="${v}" ${histFilter.judge === v ? 'selected' : ''}>${v === 'all' ? 'any' : v}</option>`).join('');
+  const sels = Object.keys(histFilter.params).map((k) => {
     const cur = histFilter.params[k] || '';
-    const open = histFilter.openKey === k;
-    const vals = [`<button type="button" data-set-param="${esc(k)}" data-set-value="" class="${cur ? '' : 'active'}">any</button>`]
-      .concat(values[k].map((v) => `<button type="button" data-set-param="${esc(k)}" data-set-value="${esc(v)}" class="${v === cur ? 'active' : ''}">${esc(v)}</button>`))
-      .join('');
-    return `<div class="frow ${open ? 'open' : ''} ${cur ? 'has' : ''}"><button type="button" class="frow-h" data-open-key="${esc(k)}"><span>${esc(k)}</span><span class="fmeta">${esc(cur || 'any')}<span class="chev">▾</span></span></button>${open ? `<div class="seg fvals">${vals}</div>` : ''}</div>`;
+    const opts = [`<option value="">any value</option>`].concat((values[k] || []).map((v) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(v)}</option>`));
+    return `<span class="fsel"><span>${esc(k)}</span><select data-param-select="${esc(k)}">${opts.join('')}</select><button type="button" class="xbtn" data-clear-param="${esc(k)}" aria-label="Remove ${esc(k)}">×</button></span>`;
   }).join('');
-  const paramBlock = keys.length ? `<div class="flabel">Parameters</div><input id="hist-filter-q" type="search" placeholder="Find a parameter…" value="${esc(histFilter.paramQuery)}"><div class="flist">${rows || '<div class="fempty muted">No parameters match.</div>'}</div>` : '';
-  $('hist-filters').innerHTML = `${chips.join('')}<button type="button" class="filter-btn" data-filter-toggle aria-expanded="${histFilter.open}">Filter</button><div class="filter-pop" id="hist-filter-pop" ${histFilter.open ? '' : 'hidden'}>${`<div class="flabel">LLM judge</div><div class="seg">${judge}</div>`}${paramBlock}</div>`;
+  const query = histFilter.paramQuery.trim().toLowerCase();
+  const unused = keys.filter((k) => !hasParam(k) && (!query || k.toLowerCase().includes(query)));
+  const menu = histFilter.open ? `<div class="filter-pop"><input id="hist-filter-q" type="search" placeholder="Find a parameter…" value="${esc(histFilter.paramQuery)}"><div class="flist">${unused.map((k) => `<button type="button" class="frow-h" data-add-key="${esc(k)}">${esc(k)}</button>`).join('') || '<div class="fempty muted">No parameters left.</div>'}</div></div>` : '';
+  const add = keys.some((k) => !hasParam(k)) ? `<span class="pop-anchor"><button type="button" data-filter-toggle aria-expanded="${histFilter.open}">+ Parameter</button>${menu}</span>` : '';
+  $('hist-filters').innerHTML = `<label class="fsel"><span>LLM judge</span><select data-judge-select>${judgeOpts}</select></label>${sels}${add}`;
   if (refocus && $('hist-filter-q')) {
     const next = $('hist-filter-q');
     next.focus();
@@ -1503,35 +1444,31 @@ $('hist-filters').addEventListener('click', (e) => {
     if (histFilter.open && $('hist-filter-q')) $('hist-filter-q').focus();
     return;
   }
+  const addKey = e.target.closest('[data-add-key]');
+  if (addKey) {
+    histFilter.params[addKey.dataset.addKey] = '';
+    closeHistFilter();
+    renderHistory();
+    return;
+  }
   const clearParam = e.target.closest('[data-clear-param]');
   if (clearParam) {
     delete histFilter.params[clearParam.dataset.clearParam];
     renderHistory();
-    return;
   }
-  const clear = e.target.closest('[data-clear]');
-  if (clear) {
-    histFilter.judge = 'all';
+});
+$('hist-filters').addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-param-select]');
+  if (sel) {
+    histFilter.params[sel.dataset.paramSelect] = sel.value;
     renderHistory();
     return;
   }
-  const set = e.target.closest('[data-set-param]');
-  if (set) {
-    if (set.dataset.setValue) histFilter.params[set.dataset.setParam] = set.dataset.setValue;
-    else delete histFilter.params[set.dataset.setParam];
+  const judgeSel = e.target.closest('[data-judge-select]');
+  if (judgeSel) {
+    histFilter.judge = judgeSel.value;
     renderHistory();
-    return;
   }
-  const row = e.target.closest('[data-open-key]');
-  if (row) {
-    histFilter.openKey = histFilter.openKey === row.dataset.openKey ? null : row.dataset.openKey;
-    renderHistFilters(histPool());
-    return;
-  }
-  const b = e.target.closest('[data-judge]');
-  if (!b || histFilter.judge === b.dataset.judge) return;
-  histFilter.judge = b.dataset.judge;
-  renderHistory();
 });
 $('hist-filters').addEventListener('input', (e) => {
   if (e.target.id !== 'hist-filter-q') return;
