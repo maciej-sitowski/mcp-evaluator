@@ -10,7 +10,9 @@ It exposes the same three functions the runner needs:
 Authentication is a GitHub token (``COPILOT_GITHUB_TOKEN``, falling back to ``GH_TOKEN`` / ``GITHUB_TOKEN``):
 a fine-grained personal access token with the "Copilot Requests" permission, or an OAuth token of a user
 with a Copilot licence. The SDK is async; every call here is synchronous (it runs its own event loop) so
-it can be used from the runner exactly like the Cursor backend.
+it can be used from the runner exactly like the Cursor backend. `preflight` is called
+from the runner's loop, where a nested `asyncio.run` is illegal, so that loop runs
+on a worker thread.
 
 Each call starts its own short-lived Copilot runtime with an empty, throw-away home and working directory,
 so nothing from your own ``~/.copilot`` (MCP servers, instructions, skills) leaks into the evaluation.
@@ -18,6 +20,7 @@ so nothing from your own ``~/.copilot`` (MCP servers, instructions, skills) leak
 
 import asyncio
 import tempfile
+import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -87,6 +90,30 @@ def _session_options(model: str, cwd: str) -> Dict[str, Any]:
     )
 
 
+def _run(main):
+    """Run `main()` (an async function) to completion, even if the caller already has an event loop."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(main())
+
+    # Nested asyncio.run() raises. Drive this call on a private loop in a worker thread.
+    box: Dict[str, Any] = {}
+
+    def work() -> None:
+        try:
+            box["value"] = asyncio.run(main())
+        except BaseException as exc:
+            box["error"] = exc
+
+    thread = threading.Thread(target=work, name="copilot-loop")
+    thread.start()
+    thread.join()
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
+
+
 # --------------------------------------------------------------------------- preflight
 async def _preflight(token: str, models: List[str]) -> Optional[str]:
     with tempfile.TemporaryDirectory(prefix="eval-copilot-home-") as home, tempfile.TemporaryDirectory(
@@ -119,7 +146,7 @@ def preflight(api_key: Optional[str], models: List[str]) -> Optional[str]:
     except ImportError:
         return "github-copilot-sdk is not installed (pip install github-copilot-sdk)"
     try:
-        return asyncio.run(_preflight(api_key, models))
+        return _run(lambda: _preflight(api_key, models))
     except Exception as exc:  # no runtime, bad token, no network, ...
         return "could not reach Copilot: %s: %s" % (type(exc).__name__, exc)
 
@@ -230,7 +257,7 @@ def _retryable(exc: BaseException) -> bool:
 
 def _once(request: str, **kwargs):
     try:
-        return asyncio.run(_run_agent_async(request, **kwargs))
+        return _run(lambda: _run_agent_async(request, **kwargs))
     except Exception as exc:  # e.g. the event loop could not be created
         out = AgentRun(status="error", error="%s: %s" % (type(exc).__name__, exc))
         out.flow = [{"type": "user", "text": request}, {"type": "error", "text": out.error}]
@@ -278,7 +305,7 @@ def judge(prompt: str, *, model: str, api_key: str) -> Tuple[Dict[str, Any], Usa
 
     def once():
         try:
-            return asyncio.run(_judge_async(prompt, model, api_key)), None
+            return _run(lambda: _judge_async(prompt, model, api_key)), None
         except Exception as exc:
             return None, exc
 
