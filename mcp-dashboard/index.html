@@ -469,7 +469,7 @@ const shortTime = (iso) => new Date(iso).toLocaleString([], { month: 'short', da
 const prodOf = (c) => c.product || c.set;
 const caseKey = (c) => prodOf(c) + '/' + c.id;
 
-// Products seen in any run, in first-seen order. Colour: product.json "color", else a stable palette slot.
+// Products seen in any run, in first-seen order. Colour: the golden file's "color", else a stable palette slot.
 let PRODUCTS = {};
 function buildProducts() {
   const reg = {};

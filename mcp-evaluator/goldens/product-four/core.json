@@ -1,4 +1,7 @@
 {
+  "name": "Product Four",
+  "color": "#c4a7e7",
+  "arguments": { "product": "product-four" },
   "goldens": [
     {
       "id": "forgot-master-password",

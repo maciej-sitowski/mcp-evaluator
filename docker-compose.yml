@@ -29,7 +29,6 @@ services:
       # and run with --no-deps (see README). A server on this machine is reachable as host.docker.internal.
       MCP_URL: ${MCP_URL:-http://mcp-server:8000/mcp}
       MCP_AUTH_HEADER: ${MCP_AUTH_HEADER:-}
-      PRODUCTS_DIR: ${PRODUCTS_DIR:-}
       RESULTS_DIR: /results
       RUN_LABEL: ${RUN_LABEL:-}
       RUN_PARAMS: ${RUN_PARAMS:-}  # JSON object; replaces RUN_PARAMS in mcp-evaluator/run_evals.py for this run
@@ -49,7 +48,6 @@ services:
       DEEPEVAL_TELEMETRY_OPT_OUT: "YES"
     volumes:
       - ./mcp-evaluator:/app
-      - ./products:/products:ro
       - ./results:/results
     extra_hosts:
       - "host.docker.internal:host-gateway"

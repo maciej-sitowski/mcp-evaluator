@@ -10,9 +10,9 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-# Placeholders: {product} {tool} {tools} {arguments_hint} {request}. A product can override it in
-# product.json ("assistant_prompt") to match how your real assistant is instructed. {tool} is the
-# bare name of the tool the direct check calls; {tools} is the phrase listing every tool this run allows.
+# Placeholders: {product} {tool} {tools} {arguments_hint} {request}. A golden file may override the
+# prompt with "assistant_prompt". {tool} is the bare name of the tool the direct check calls;
+# {tools} is the phrase listing every tool this run allows.
 AGENT_PROMPT = """You are a support assistant for {product}.
 Answer the customer's question using ONLY the documentation returned by {tools} of the MCP server.
 {arguments_hint}If the documentation does not cover the question, say so plainly instead of guessing.

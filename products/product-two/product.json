@@ -1,7 +1,0 @@
-{
-  "name": "Product Two",
-  "description": "Placeholder documentation (an uptime-monitoring service). Replace docs/ with your own.",
-  "color": "#5fd39a",
-  "tool": "search_docs",
-  "default_arguments": { "product": "product-two" }
-}

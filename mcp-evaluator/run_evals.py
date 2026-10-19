@@ -1,7 +1,7 @@
 """Run the product goldens against the MCP server and store the results as JSON.
 
-Products live in ``products/<id>/`` (docs/, product.json). Golden sets live in ``goldens/<id>/`` next to
-this file. For every golden:
+Products are the golden sets in ``goldens/<id>/`` next to this file. The folder name is the product id.
+For every golden:
   1. call the real MCP tool over HTTP with fixed arguments,
   2. wrap the response in a DeepEval `LLMTestCase`,
   3. score it with the metrics in `metrics/search.py`,
@@ -26,14 +26,8 @@ JUDGE_PROVIDER = None
 AGENT_MODEL = None
 JUDGE_MODEL = None
 
-# Folder with one sub-folder per product (product.json, docs/). A relative path is resolved from the
-# repo root. Inside Docker the repo's `products/` folder is mounted at /products, which is where
-# "products" lands; to use a folder elsewhere, change the `./products:/products` mounts in
-# docker-compose.yml as well. Golden sets are not in that folder: they live in goldens/<id>/ here.
-PRODUCTS_DIR = "products"
-
-# MCP tools this run may call. None = each product.json "tool", and the agent sees every tool on
-# the server. A list replaces that for the whole run: every name must exist on the server, the
+# MCP tools this run may call. None = the default tool name "search_docs", and the agent sees every
+# tool on the server. A list replaces that for the whole run: every name must exist on the server, the
 # direct check calls the first one for every product, and the agent is given only these.
 # The search metrics still expect a payload shaped like search_docs (a `results` list of doc hits).
 # Override for one run with --tool name (repeatable) or TOOLS=name1,name2.
@@ -91,19 +85,14 @@ from sources.products import DEFAULT_QUERY_ARGUMENT, Product, load_products, nor
 HERE = Path(__file__).parent
 
 
-def default_products_dir() -> str:
-    """$PRODUCTS_DIR, else PRODUCTS_DIR from the CONFIG section; relative paths start at the repo root."""
-    path = Path(os.environ.get("PRODUCTS_DIR") or PRODUCTS_DIR).expanduser()
-    return str(path if path.is_absolute() else HERE.parent / path)
-
-
 # --------------------------------------------------------------------------- goldens
 def build_goldens(product: Product, all_ids: List[str], tool_names: Optional[List[str]] = None) -> List[Golden]:
     names = list(tool_names or [product.tool])
     goldens = []
     for g in product.goldens:
-        # The golden's own arguments win over the product's defaults; with none, the question is the query.
-        arguments = {**product.default_arguments, **g.get("arguments", {DEFAULT_QUERY_ARGUMENT: g["input"]})}
+        # The question's own arguments win over the file's shared `arguments`; with none, the question is the query.
+        shared = g.get("_shared_arguments", product.default_arguments)
+        arguments = {**shared, **g.get("arguments", {DEFAULT_QUERY_ARGUMENT: g["input"]})}
         expected = normalize_patterns(g.get("expected_docs", []), product.id, all_ids)
         forbidden = normalize_patterns(g.get("forbidden_docs", []), product.id, all_ids)
         reference = g.get("reference_answer")
@@ -366,7 +355,7 @@ def build_headers(args: argparse.Namespace) -> Dict[str, str]:
 
 async def run(args: argparse.Namespace) -> int:
     headers = build_headers(args)
-    products = load_products(Path(args.products_dir), HERE / "goldens", args.products, args.cases)
+    products = load_products(HERE / "goldens", args.products, args.cases)
     all_ids = [p.id for p in products]
     wait_for_server(args.mcp_url, headers=headers)
     if headers:
@@ -486,7 +475,7 @@ def setup_llm(args: argparse.Namespace, headers: Dict[str, str]):
 
 
 def resolve_tools(args: argparse.Namespace) -> Optional[List[str]]:
-    """--tool, else $TOOLS, else TOOLS in CONFIG. None keeps each product.json tool."""
+    """--tool, else $TOOLS, else TOOLS in CONFIG. None keeps the default tool name."""
     if args.tools:
         names = args.tools
     else:
@@ -508,7 +497,7 @@ def resolve_tools(args: argparse.Namespace) -> Optional[List[str]]:
         if text and text not in out:
             out.append(text)
     if not out:
-        raise SystemExit("TOOLS is empty; set at least one tool name, or None to use each product.json")
+        raise SystemExit("TOOLS is empty; set at least one tool name, or None to use the default tool name")
     return out
 
 
@@ -569,7 +558,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--mcp-header", action="append", default=[], metavar="'Name: value'",
                    help="extra HTTP header for the MCP server (repeatable). MCP_AUTH_HEADER sets Authorization.")
     p.add_argument("--results-dir", default=os.environ.get("RESULTS_DIR", "/results"))
-    p.add_argument("--products-dir", default=default_products_dir())
     p.add_argument("--label", default=os.environ.get("RUN_LABEL", ""), help="free-text note stored in the run file")
     p.add_argument("--param", action="append", default=[], metavar="key=value",
                    help="parameter stored with this run and shown in the history table (repeatable). "

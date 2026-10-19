@@ -1,7 +1,0 @@
-{
-  "name": "Product Four",
-  "description": "Placeholder documentation (a password manager). Replace docs/ with your own.",
-  "color": "#c4a7e7",
-  "tool": "search_docs",
-  "default_arguments": { "product": "product-four" }
-}

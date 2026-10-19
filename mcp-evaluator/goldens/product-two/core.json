@@ -1,4 +1,7 @@
 {
+  "name": "Product Two",
+  "color": "#5fd39a",
+  "arguments": { "product": "product-two" },
   "goldens": [
     {
       "id": "check-interval",

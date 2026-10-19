@@ -1,4 +1,7 @@
 {
+  "name": "Product Three",
+  "color": "#f3c066",
+  "arguments": { "product": "product-three" },
   "goldens": [
     {
       "id": "message-history-free",

@@ -1,7 +1,0 @@
-{
-  "name": "Product Three",
-  "description": "Placeholder documentation (a team chat app). Replace docs/ with your own.",
-  "color": "#f3c066",
-  "tool": "search_docs",
-  "default_arguments": { "product": "product-three" }
-}

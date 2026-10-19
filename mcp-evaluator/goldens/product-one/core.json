@@ -1,4 +1,7 @@
 {
+  "name": "Product One",
+  "color": "#6ea8fe",
+  "arguments": { "product": "product-one" },
   "goldens": [
     {
       "id": "restore-deleted-note",

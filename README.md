@@ -9,7 +9,7 @@ Three pieces: a mock MCP server that searches product docs, a one-shot runner th
 - [A different MCP server](#a-different-mcp-server)
 
 ```
-products/          Docs, one folder per product. Mounted read-only into the server and the runner.
+products/          Docs only, one folder per product. Mounted read-only into the MCP server.
 mcp_server/        Long-running. search_docs at http://localhost:8000/mcp
 mcp-evaluator/     One shot. Golden sets live in goldens/<id>/. Writes results/runs/<id>.json
 mcp-dashboard/     Long-running. Reads those files at http://localhost:8080
@@ -33,7 +33,7 @@ Without a key, step 2 is skipped and the run says so.
 
 **mcp-server** indexes `products/*/docs/*.md` on each search. `SEARCH_ENGINE=v1` is exact keywords. `v2` adds stemming, synonyms, and typo tolerance. Restart it after server code changes. Doc edits need no restart.
 
-**mcp-evaluator** waits until the server is healthy, then runs. It reads golden sets from `goldens/<id>/` (same folder name as the product), mounts `products/` for `product.json`, and writes `results/`. The agent and the judge are chosen in the CONFIG block at the top of `mcp-evaluator/run_evals.py`, and so are the MCP tools (`TOOLS`). A flag or an environment variable overrides that for one run. `RUN_PARAMS` in that block is stored on the run and shown in the history table, so a score can be matched to the change that produced it. Secrets live in `.env` (see `.env.example`).
+**mcp-evaluator** waits until the server is healthy, then runs. It reads each product from `goldens/<id>/` (the folder name is the product id) and writes `results/`. The agent, the judge, and the MCP tools (`TOOLS`) are chosen in the CONFIG block at the top of `mcp-evaluator/run_evals.py`. A flag or an environment variable overrides that for one run. `RUN_PARAMS` in that block is stored on the run and shown in the history table, so a score can be matched to the change that produced it. Secrets live in `.env` (see `.env.example`).
 
 **mcp-dashboard** serves the page and `/api/runs`. It mounts the same `results/` folder, so a new file shows up on refresh. It can also delete runs.
 
@@ -58,7 +58,7 @@ Cursor needs `CURSOR_API_KEY`. Copilot needs `COPILOT_GITHUB_TOKEN` (a PAT with 
 
 ## Add a product
 
-Copy `products/product-one` and `mcp-evaluator/goldens/product-one`, and give both folders the same new id. In `product.json`, set `name`, `color`, and `default_arguments.product` to that id. Replace `docs/*.md` and the golden JSON.
+Copy `products/product-one` for the docs the server searches, and `mcp-evaluator/goldens/product-one` for the questions. Give both folders the same id. In the golden file, set `name`, `color`, and `arguments` (shared by every question, such as `{"product": "<id>"}`). Replace `docs/*.md` and the questions.
 
 A golden is one customer question. `expected_docs` is what search should return: `file.md#section`, `file.md` for any section of that file, or `[]` when nothing should be found. Optional: `forbidden_docs`, `reference_answer`, `must_include`. See `mcp-evaluator/goldens/product-one/core.json`.
 
