@@ -33,7 +33,7 @@ Without a key, step 2 is skipped and the run says so.
 
 **mcp-server** indexes `products/*/docs/*.md` on each search. `SEARCH_ENGINE=v1` is exact keywords. `v2` adds stemming, synonyms, and typo tolerance. Restart it after server code changes. Doc edits need no restart.
 
-**mcp-evaluator** waits until the server is healthy, then runs. It reads golden sets from `goldens/<id>/` (same folder name as the product), mounts `products/` for `product.json`, and writes `results/`. The agent and the judge are chosen in the CONFIG block at the top of `mcp-evaluator/run_evals.py`. A flag or an environment variable overrides that for one run. `RUN_PARAMS` in that block is stored on the run and shown in the history table, so a score can be matched to the change that produced it. Secrets live in `.env` (see `.env.example`).
+**mcp-evaluator** waits until the server is healthy, then runs. It reads golden sets from `goldens/<id>/` (same folder name as the product), mounts `products/` for `product.json`, and writes `results/`. The agent and the judge are chosen in the CONFIG block at the top of `mcp-evaluator/run_evals.py`, and so are the MCP tools (`TOOLS`). A flag or an environment variable overrides that for one run. `RUN_PARAMS` in that block is stored on the run and shown in the history table, so a score can be matched to the change that produced it. Secrets live in `.env` (see `.env.example`).
 
 **mcp-dashboard** serves the page and `/api/runs`. It mounts the same `results/` folder, so a new file shows up on refresh. It can also delete runs.
 
@@ -74,6 +74,6 @@ MCP_AUTH_HEADER=Bearer <token>
 docker compose run --rm --no-deps mcp-evaluator
 ```
 
-The tool name must match `product.json`, and each hit needs an id like `product/file.md#section`.
+The tool names are `TOOLS` in the CONFIG block of `mcp-evaluator/run_evals.py`. The direct check calls the first name; the agent is given only the list. `--tool name` (repeatable) or `TOOLS=name1,name2` overrides it for one run. Each hit still needs an id like `product/file.md#section`.
 
 Chart.js loads from a CDN, so the browser needs network access to draw charts.

@@ -76,10 +76,19 @@ def _tool_name(test_case: LLMTestCase) -> str:
     return case_meta(test_case).get("tool_name", "search_docs")
 
 
+def _tool_names(test_case: LLMTestCase) -> List[str]:
+    meta = case_meta(test_case)
+    names = meta.get("tool_names")
+    if isinstance(names, list) and names:
+        return [str(n) for n in names]
+    return [_tool_name(test_case)]
+
+
 def _agent_call(test_case: LLMTestCase) -> Dict[str, Any]:
-    tool = _tool_name(test_case)
+    tools = _tool_names(test_case)
     for call in case_meta(test_case).get("agent_tool_calls", []):
-        if str(call.get("name", "")).endswith(tool):
+        name = str(call.get("name", ""))
+        if any(name == tool or name.endswith(tool) for tool in tools):
             return call
     return {}
 
@@ -120,7 +129,7 @@ class AgentToolUse(DeterministicMetric):
         agent_error = case_meta(test_case).get("agent_error")
         if agent_error:
             return 0.0, "Agent run failed: %s" % agent_error
-        tool = _tool_name(test_case)
+        tool = ", ".join(_tool_names(test_case))
         call = _agent_call(test_case)
         if not call:
             names = [c.get("name") for c in case_meta(test_case).get("agent_tool_calls", [])]
@@ -141,7 +150,7 @@ class AgentRecall(DeterministicMetric):
             return 0.0, "Agent run failed: %s" % case_meta(test_case)["agent_error"]
         call = _agent_call(test_case)
         if not call:
-            return 0.0, "Agent never called %s" % _tool_name(test_case)
+            return 0.0, "Agent never called %s" % ", ".join(_tool_names(test_case))
         returned = [r.get("id") for r in _all_results(call)]
         expected = case_meta(test_case).get("expected_ids", [])
         if not expected:

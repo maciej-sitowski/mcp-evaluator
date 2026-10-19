@@ -153,7 +153,7 @@ def preflight(api_key: Optional[str], models: List[str]) -> Optional[str]:
 
 # --------------------------------------------------------------------------- agent
 async def _run_agent_async(
-    request: str, prompt: str, mcp_url: str, model: str, token: str, headers: Optional[Dict[str, str]]
+    request: str, prompt: str, mcp_url: str, model: str, token: str, headers: Optional[Dict[str, str]], tools=None
 ) -> "tuple[AgentRun, Optional[BaseException]]":
     """Let a Copilot agent handle `request` with the MCP server as its only tool.
 
@@ -216,13 +216,17 @@ async def _run_agent_async(
         client = _client(token, home, cwd)
         try:
             await asyncio.wait_for(client.start(), START_TIMEOUT_S)
-            mcp = {"type": "http", "url": mcp_url, "tools": ["*"]}
+            names = list(tools) if tools else ["*"]
+            mcp = {"type": "http", "url": mcp_url, "tools": names}
             if headers:
                 mcp["headers"] = dict(headers)
+            allowed = ToolSet()
+            for name in names:
+                allowed.add_mcp(name)
             async with await client.create_session(
                 **_session_options(model, cwd),
                 mcp_servers={"docs": mcp},
-                available_tools=ToolSet().add_mcp("*"),  # no shell / file access, only MCP tools
+                available_tools=allowed,  # no shell / file access, only the configured MCP tools
             ) as session:
                 session.on(on_event)
                 final = await session.send_and_wait(prompt, timeout=TURN_TIMEOUT_S)
@@ -264,9 +268,9 @@ def _once(request: str, **kwargs):
         return out, exc
 
 
-def run_agent(request: str, *, prompt: str, mcp_url: str, model: str, api_key: str, headers=None) -> AgentRun:
+def run_agent(request: str, *, prompt: str, mcp_url: str, model: str, api_key: str, headers=None, tools=None) -> AgentRun:
     out, _ = with_retries(
-        lambda: _once(request, prompt=prompt, mcp_url=mcp_url, model=model, token=api_key, headers=headers),
+        lambda: _once(request, prompt=prompt, mcp_url=mcp_url, model=model, token=api_key, headers=headers, tools=tools),
         _retryable,
     )
     return out

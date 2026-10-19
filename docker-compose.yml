@@ -41,6 +41,7 @@ services:
       # these only override it for a single run, e.g. AGENT_PROVIDER=copilot docker compose run --rm mcp-evaluator
       AGENT_PROVIDER: ${AGENT_PROVIDER:-}
       JUDGE_PROVIDER: ${JUDGE_PROVIDER:-}
+      TOOLS: ${TOOLS:-}  # comma-separated; replaces TOOLS in mcp-evaluator/run_evals.py for this run
       CURSOR_API_KEY: ${CURSOR_API_KEY:-}
       COPILOT_GITHUB_TOKEN: ${COPILOT_GITHUB_TOKEN:-}
       AGENT_MODEL: ${AGENT_MODEL:-}

@@ -74,11 +74,16 @@ def _unwrap_call(name: str, args: Any) -> Dict[str, Any]:
     return {"name": name, "server": None, "arguments": args}
 
 
-def _run_agent_once(request: str, *, prompt: str, mcp_url: str, model: str, api_key: str, headers=None) -> "tuple[AgentRun, Optional[BaseException]]":
+def _run_agent_once(
+    request: str, *, prompt: str, mcp_url: str, model: str, api_key: str, headers=None, tools=None
+) -> "tuple[AgentRun, Optional[BaseException]]":
     """Let a Cursor agent handle `request` with the MCP server as its only tool.
 
     `flow` is the ordered conversation: user request -> assistant text / tool calls (with the raw MCP
     responses) -> final answer. It is stored in the run file and shown in the dashboard.
+
+    `tools` is the allowlist from the run config. Cursor's `tools` option only selects built-in
+    groups (`mcp` = every MCP tool), so the allowlist is enforced by the prompt, not by the SDK.
     """
     from cursor_sdk import Agent, AgentOptions, HttpMcpServerConfig, LocalAgentOptions
 
@@ -144,9 +149,11 @@ def _retryable(exc: BaseException) -> bool:
     return bool(getattr(exc, "is_retryable", False)) or type(exc).__name__ in ("InternalServerError", "RateLimitError", "NetworkError", "APITimeoutError")
 
 
-def run_agent(request: str, *, prompt: str, mcp_url: str, model: str, api_key: str, headers=None) -> AgentRun:
+def run_agent(request: str, *, prompt: str, mcp_url: str, model: str, api_key: str, headers=None, tools=None) -> AgentRun:
     out, _ = with_retries(
-        lambda: _run_agent_once(request, prompt=prompt, mcp_url=mcp_url, model=model, api_key=api_key, headers=headers),
+        lambda: _run_agent_once(
+            request, prompt=prompt, mcp_url=mcp_url, model=model, api_key=api_key, headers=headers, tools=tools
+        ),
         _retryable,
     )
     return out

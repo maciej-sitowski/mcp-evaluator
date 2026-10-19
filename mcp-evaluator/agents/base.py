@@ -10,22 +10,30 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-# Placeholders: {product} {tool} {arguments_hint} {request}. A product can override it in product.json
-# ("assistant_prompt") to match how your real assistant is instructed.
+# Placeholders: {product} {tool} {tools} {arguments_hint} {request}. A product can override it in
+# product.json ("assistant_prompt") to match how your real assistant is instructed. {tool} is the
+# bare name of the tool the direct check calls; {tools} is the phrase listing every tool this run allows.
 AGENT_PROMPT = """You are a support assistant for {product}.
-Answer the customer's question using ONLY the documentation returned by the `{tool}` tool of the MCP server.
+Answer the customer's question using ONLY the documentation returned by {tools} of the MCP server.
 {arguments_hint}If the documentation does not cover the question, say so plainly instead of guessing.
 Keep the answer short.
 
 Customer: {request}"""
 
 
-def agent_prompt(template, product: str, tool: str, default_arguments: Dict[str, Any], request: str) -> str:
+def agent_prompt(
+    template, product: str, tool: str, default_arguments: Dict[str, Any], request: str, tools: Optional[List[str]] = None
+) -> str:
+    names = [n for n in (tools or [tool]) if n] or [tool]
+    if len(names) == 1:
+        phrase = "the `%s` tool" % names[0]
+    else:
+        phrase = "these tools: %s" % ", ".join("`%s`" % n for n in names)
     hint = ""
     if default_arguments:
         hint = "When you call the tool, always pass these arguments: %s.\n" % json.dumps(default_arguments)
     return (template or AGENT_PROMPT).format(
-        product=product, tool=tool, arguments_hint=hint, request=request
+        product=product, tool=names[0], tools=phrase, arguments_hint=hint, request=request
     )
 
 

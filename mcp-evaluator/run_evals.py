@@ -32,6 +32,13 @@ JUDGE_MODEL = None
 # docker-compose.yml as well. Golden sets are not in that folder: they live in goldens/<id>/ here.
 PRODUCTS_DIR = "products"
 
+# MCP tools this run may call. None = each product.json "tool", and the agent sees every tool on
+# the server. A list replaces that for the whole run: every name must exist on the server, the
+# direct check calls the first one for every product, and the agent is given only these.
+# The search metrics still expect a payload shaped like search_docs (a `results` list of doc hits).
+# Override for one run with --tool name (repeatable) or TOOLS=name1,name2.
+TOOLS = ["search_docs"]
+
 # What you changed for this run. Stored on the run file and shown in the history table, so a score
 # change can be matched to the change that produced it. Keys and values are yours; leave the dict
 # empty to store nothing. Override for one run with --param key=value (repeatable), or replace the
@@ -91,7 +98,8 @@ def default_products_dir() -> str:
 
 
 # --------------------------------------------------------------------------- goldens
-def build_goldens(product: Product, all_ids: List[str]) -> List[Golden]:
+def build_goldens(product: Product, all_ids: List[str], tool_names: Optional[List[str]] = None) -> List[Golden]:
+    names = list(tool_names or [product.tool])
     goldens = []
     for g in product.goldens:
         # The golden's own arguments win over the product's defaults; with none, the question is the query.
@@ -108,6 +116,7 @@ def build_goldens(product: Product, all_ids: List[str]) -> List[Golden]:
                     "product": product.id,
                     "product_name": product.name,
                     "tool_name": product.tool,
+                    "tool_names": names,
                     "arguments": arguments,
                     "expected_ids": expected,
                     "forbidden_ids": forbidden,
@@ -193,7 +202,10 @@ async def run_agent_metrics(
 ) -> "tuple[Dict[str, Any], Dict[str, Any]]":
     """Let the agent (Cursor or Copilot) answer the golden's `input` itself, then grade it (incl. LLM-as-a-judge)."""
     tool = golden.additional_metadata["tool_name"]
-    prompt = agent_prompt(product.assistant_prompt, product.name, tool, product.default_arguments, golden.input)
+    names = golden.additional_metadata.get("tool_names") or [tool]
+    prompt = agent_prompt(
+        product.assistant_prompt, product.name, tool, product.default_arguments, golden.input, tools=names
+    )
     # The SDK is synchronous; run it in a worker thread so the MCP session stays responsive.
     agent = await asyncio.to_thread(
         llm["agent"]["backend"].run_agent,
@@ -203,11 +215,12 @@ async def run_agent_metrics(
         model=llm["agent"]["model"],
         api_key=llm["agent"]["api_key"],
         headers=llm["headers"],
+        tools=llm["tools"],
     )
     meta = dict(golden.additional_metadata)
     meta["agent_tool_calls"] = agent.tool_calls
     meta["agent_error"] = agent.error
-    first = next((c for c in agent.tool_calls if str(c["name"]).endswith(tool)), None)
+    first = next((c for c in agent.tool_calls if any(str(c["name"]).endswith(n) for n in names)), None)
     results = (first or {}).get("output")
     results = results.get("results", []) if isinstance(results, dict) else []
     test_case = LLMTestCase(
@@ -362,17 +375,43 @@ async def run(args: argparse.Namespace) -> int:
     llm, llm_status = setup_llm(args, headers)
     print(llm_status)
 
+    chosen = resolve_tools(args)
     cases: List[Dict[str, Any]] = []
+    problem = None
     async with open_session(args.mcp_url, headers=headers) as session:
-        tools = [t.name for t in (await session.list_tools()).tools]
-        for product in products:
-            if product.tool not in tools:
-                raise SystemExit(
-                    "Tool %r (product %s) not exposed by the server (found: %s)" % (product.tool, product.id, tools)
+        exposed = [t.name for t in (await session.list_tools()).tools]
+        if chosen:
+            missing = [name for name in chosen if name not in exposed]
+            if missing:
+                problem = "Tool(s) not exposed by the server: %s (found: %s)" % (
+                    ", ".join(missing), ", ".join(exposed) or "none",
                 )
-            for golden in build_goldens(product, all_ids):
-                cases.append(await run_golden(session, product, golden, llm))
-                print("  done %s/%s" % (product.id, golden.additional_metadata["id"]), flush=True)
+        else:
+            for product in products:
+                if product.tool not in exposed:
+                    problem = "Tool %r (product %s) not exposed by the server (found: %s)" % (
+                        product.tool, product.id, ", ".join(exposed) or "none",
+                    )
+                    break
+        if problem is None:
+            run_tools = chosen
+            if chosen:
+                for product in products:
+                    product.tool = chosen[0]
+            else:
+                run_tools = []
+                for product in products:
+                    if product.tool not in run_tools:
+                        run_tools.append(product.tool)
+            if llm:
+                llm["tools"] = chosen
+            print("Tools: %s" % ", ".join(run_tools))
+            for product in products:
+                for golden in build_goldens(product, all_ids, chosen):
+                    cases.append(await run_golden(session, product, golden, llm))
+                    print("  done %s/%s" % (product.id, golden.additional_metadata["id"]), flush=True)
+    if problem:
+        raise SystemExit(problem)
 
     now = datetime.now(timezone.utc)
     run_record = {
@@ -382,7 +421,7 @@ async def run(args: argparse.Namespace) -> int:
         "params": resolve_run_params(args),
         "engine": detect_engine(args.mcp_url),
         "mcp_url": args.mcp_url,
-        "tools": tools,
+        "tools": run_tools,
         "llm_judge": {
             "enabled": bool(llm),
             "status": llm_status,
@@ -444,6 +483,33 @@ def setup_llm(args: argparse.Namespace, headers: Dict[str, str]):
     return config, "LLM judge: enabled (agent=%s/%s, judge=%s/%s)" % (
         roles["agent"]["provider"], roles["agent"]["model"], roles["judge"]["provider"], roles["judge"]["model"],
     )
+
+
+def resolve_tools(args: argparse.Namespace) -> Optional[List[str]]:
+    """--tool, else $TOOLS, else TOOLS in CONFIG. None keeps each product.json tool."""
+    if args.tools:
+        names = args.tools
+    else:
+        env = (os.environ.get("TOOLS") or "").strip()
+        if env:
+            names = [part.strip() for part in env.split(",") if part.strip()]
+        elif TOOLS is None:
+            return None
+        elif isinstance(TOOLS, str):
+            names = [part.strip() for part in TOOLS.split(",") if part.strip()]
+        else:
+            try:
+                names = list(TOOLS)
+            except TypeError:
+                raise SystemExit("TOOLS must be a list of tool names or None, got %s" % type(TOOLS).__name__)
+    out: List[str] = []
+    for name in names:
+        text = str(name).strip()
+        if text and text not in out:
+            out.append(text)
+    if not out:
+        raise SystemExit("TOOLS is empty; set at least one tool name, or None to use each product.json")
+    return out
 
 
 def resolve_run_params(args: argparse.Namespace) -> Dict[str, str]:
@@ -508,6 +574,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--param", action="append", default=[], metavar="key=value",
                    help="parameter stored with this run and shown in the history table (repeatable). "
                         "RUN_PARAMS='{\"k\": \"v\"}' replaces the RUN_PARAMS dict in the CONFIG section.")
+    p.add_argument("--tool", dest="tools", action="append", default=[], metavar="NAME",
+                   help="MCP tool this run may call (repeatable). Replaces TOOLS in the CONFIG section; "
+                        "TOOLS=name1,name2 does the same. The direct check calls the first name.")
     p.add_argument("--product", dest="products", action="append", default=_env_list("PRODUCT"), metavar="ID",
                    help="only run this product id (repeatable; or PRODUCT=id1,id2)")
     p.add_argument("--case", dest="cases", action="append", default=_env_list("CASE"), metavar="ID",
