@@ -8,7 +8,7 @@ Two engines are available so you can watch evaluation results change over time:
   fuzzy matching of unknown words against the documentation vocabulary.
 
 Pick one with the ``SEARCH_ENGINE`` environment variable (see docker-compose.yml).
-A search always stays inside one product: that is what the evals' ProductIsolation check verifies.
+A search always stays inside one product: that is what the evaluator's ProductIsolation check verifies.
 """
 
 import difflib

@@ -17,9 +17,9 @@ services:
       timeout: 3s
       retries: 15
 
-  # On-demand eval run:  docker compose run --rm evals
-  evals:
-    build: ./evals
+  # On-demand eval run:  docker compose run --rm mcp-evaluator
+  mcp-evaluator:
+    build: ./mcp-evaluator
     profiles: ["eval"]
     depends_on:
       mcp-server:
@@ -32,13 +32,13 @@ services:
       PRODUCTS_DIR: ${PRODUCTS_DIR:-}
       RESULTS_DIR: /results
       RUN_LABEL: ${RUN_LABEL:-}
-      RUN_PARAMS: ${RUN_PARAMS:-}  # JSON object; replaces RUN_PARAMS in evals/run_evals.py for this run
+      RUN_PARAMS: ${RUN_PARAMS:-}  # JSON object; replaces RUN_PARAMS in mcp-evaluator/run_evals.py for this run
       PRODUCT: ${PRODUCT:-}  # PRODUCT=product-two[,product-one] runs only those products
       CASE: ${CASE:-}
       LATENCY_THRESHOLD_MS: ${LATENCY_THRESHOLD_MS:-500}
       # Optional: enables the agent + LLM-as-a-judge metrics. Without a key they are skipped.
-      # Agent / judge / models / products are configured in evals/run_evals.py (CONFIG section);
-      # these only override it for a single run, e.g. AGENT_PROVIDER=copilot docker compose run --rm evals
+      # Agent / judge / models / products are configured in mcp-evaluator/run_evals.py (CONFIG section);
+      # these only override it for a single run, e.g. AGENT_PROVIDER=copilot docker compose run --rm mcp-evaluator
       AGENT_PROVIDER: ${AGENT_PROVIDER:-}
       JUDGE_PROVIDER: ${JUDGE_PROVIDER:-}
       CURSOR_API_KEY: ${CURSOR_API_KEY:-}
@@ -47,19 +47,19 @@ services:
       JUDGE_MODEL: ${JUDGE_MODEL:-}
       DEEPEVAL_TELEMETRY_OPT_OUT: "YES"
     volumes:
-      - ./evals:/app
+      - ./mcp-evaluator:/app
       - ./products:/products:ro
       - ./results:/results
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
   # Results dashboard: http://localhost:8080
-  dashboard:
-    build: ./dashboard
+  mcp-dashboard:
+    build: ./mcp-dashboard
     environment:
       RESULTS_DIR: /results
     ports:
       - "8080:8080"
     volumes:
-      - ./dashboard:/app:ro
+      - ./mcp-dashboard:/app:ro
       - ./results:/results   # writable: the dashboard can clear the run history

@@ -1,7 +1,8 @@
-"""Loads the products under test: ``products/<id>/{product.json, docs/, goldens/*.json}``.
+"""Loads the products under test.
 
-A product is just a folder. Add a folder and it is picked up by the MCP server (docs) and by the evals
-(goldens) with no code changes. See the README for the file formats.
+Docs and ``product.json`` live in ``products/<id>/`` (what the MCP server searches). Golden sets live
+next to this runner, in ``goldens/<id>/*.json``, joined to a product by the folder name. Add a product
+folder and a matching golden set and both are picked up with no code changes. See the README.
 """
 
 import json
@@ -32,9 +33,12 @@ def _read_json(path: Path) -> Any:
         raise SystemExit("Invalid JSON in %s: %s" % (path, exc))
 
 
-def _load_goldens(product_dir: Path) -> List[Dict[str, Any]]:
+def _load_goldens(golden_dir: Path) -> List[Dict[str, Any]]:
+    """One product's golden set: every ``*.json`` in ``goldens/<product-id>/``."""
+    if not golden_dir.is_dir():
+        return []
     goldens: List[Dict[str, Any]] = []
-    for path in sorted((product_dir / "goldens").glob("*.json")):
+    for path in sorted(golden_dir.glob("*.json")):
         spec = _read_json(path)
         items = spec["goldens"] if isinstance(spec, dict) else spec
         for g in items:
@@ -47,15 +51,28 @@ def _load_goldens(product_dir: Path) -> List[Dict[str, Any]]:
     ids = [g["id"] for g in goldens]
     dupes = sorted({i for i in ids if ids.count(i) > 1})
     if dupes:
-        raise SystemExit("%s: duplicate golden ids: %s" % (product_dir.name, ", ".join(dupes)))
+        raise SystemExit("%s: duplicate golden ids: %s" % (golden_dir.name, ", ".join(dupes)))
     return goldens
 
 
-def load_products(products_dir: Path, only: List[str] = (), only_cases: List[str] = ()) -> List[Product]:
+def load_products(
+    products_dir: Path, goldens_dir: Path, only: List[str] = (), only_cases: List[str] = ()
+) -> List[Product]:
     if not products_dir.is_dir():
         raise SystemExit("Products directory not found: %s" % products_dir)
+    if not goldens_dir.is_dir():
+        raise SystemExit("Goldens directory not found: %s" % goldens_dir)
+    product_dirs = sorted(p for p in products_dir.iterdir() if p.is_dir() and not p.name.startswith("."))
+    known = {p.name for p in product_dirs}
+    extra = sorted(
+        p.name
+        for p in goldens_dir.iterdir()
+        if p.is_dir() and not p.name.startswith(".") and p.name not in known and (not only or p.name in only)
+    )
+    if extra:
+        raise SystemExit("Golden sets with no matching product in %s: %s" % (products_dir, ", ".join(extra)))
     products: List[Product] = []
-    for product_dir in sorted(p for p in products_dir.iterdir() if p.is_dir() and not p.name.startswith(".")):
+    for product_dir in product_dirs:
         if only and product_dir.name not in only:
             continue
         meta_path = product_dir / "product.json"
@@ -68,7 +85,7 @@ def load_products(products_dir: Path, only: List[str] = (), only_cases: List[str
             tool=meta.get("tool", "search_docs"),
             default_arguments=meta.get("default_arguments", {}),
             assistant_prompt=meta.get("assistant_prompt"),
-            goldens=_load_goldens(product_dir),
+            goldens=_load_goldens(goldens_dir / product_dir.name),
         )
         if only_cases:
             product.goldens = [g for g in product.goldens if g["id"] in only_cases]
@@ -76,7 +93,8 @@ def load_products(products_dir: Path, only: List[str] = (), only_cases: List[str
             products.append(product)
     if not products:
         raise SystemExit(
-            "No goldens found in %s (products: %s, cases: %s)" % (products_dir, list(only) or "all", list(only_cases) or "all")
+            "No goldens found in %s (products: %s, cases: %s)"
+            % (goldens_dir, list(only) or "all", list(only_cases) or "all")
         )
     return products
 

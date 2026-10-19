@@ -1,8 +1,10 @@
 """Loads product documentation into searchable chunks.
 
-Layout (shared with the evals, see README):
+Layout (see README):
 
     products/<product-id>/docs/*.md
+
+Golden sets are not here. They live in ``mcp-evaluator/goldens/<product-id>/``.
 
 Every markdown file is split into chunks at its headings (``#``, ``##``, ``###``). A chunk id looks like
 ``product-one/pricing.md#plans`` (product / file # slugified heading); text before the first ``##`` heading

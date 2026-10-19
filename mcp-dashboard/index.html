@@ -381,7 +381,7 @@
   <section id="empty" class="card empty" hidden>
     <h2>No runs yet</h2>
     <p>Run the evaluations and refresh this page:</p>
-    <pre>docker compose run --rm evals</pre>
+    <pre>docker compose run --rm mcp-evaluator</pre>
   </section>
 
   <!-- ============================== OVERVIEW ============================== -->
@@ -483,7 +483,7 @@ const productIds = (runs) => Object.keys(PRODUCTS).filter((id) => runs.some((r) 
 const pinfo = (id) => PRODUCTS[id] || { id, name: id, color: '#8b95a7' };
 const pdot = (id) => `<span class="pdot" style="background:${esc(pinfo(id).color)}"></span>`;
 
-// Does a returned chunk id satisfy a golden's doc reference? (same rules as evals/metrics/base.py `matches`)
+// Does a returned chunk id satisfy a golden's doc reference? (same rules as mcp-evaluator/metrics/base.py `matches`)
 const matchesRef = (rid, pat) => (pat.endsWith('*') ? rid.startsWith(pat.slice(0, -1)) : rid === pat || rid.startsWith(pat + '#'));
 
 // Metrics are shown in these groups (charts, verdict tables). Unknown names fall into "Other".

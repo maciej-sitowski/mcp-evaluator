@@ -1,6 +1,7 @@
 """Run the product goldens against the MCP server and store the results as JSON.
 
-Products live in ``products/<id>/`` (docs/, goldens/, product.json). For every golden:
+Products live in ``products/<id>/`` (docs/, product.json). Golden sets live in ``goldens/<id>/`` next to
+this file. For every golden:
   1. call the real MCP tool over HTTP with fixed arguments,
   2. wrap the response in a DeepEval `LLMTestCase`,
   3. score it with the metrics in `metrics/search.py`,
@@ -25,10 +26,10 @@ JUDGE_PROVIDER = None
 AGENT_MODEL = None
 JUDGE_MODEL = None
 
-# Folder with one sub-folder per product (product.json, docs/, goldens/). A relative path is resolved
-# from the repo root. Inside Docker the repo's `products/` folder is mounted at /products, which is
-# where "products" lands; to use a folder elsewhere, change the `./products:/products` mounts in
-# docker-compose.yml as well.
+# Folder with one sub-folder per product (product.json, docs/). A relative path is resolved from the
+# repo root. Inside Docker the repo's `products/` folder is mounted at /products, which is where
+# "products" lands; to use a folder elsewhere, change the `./products:/products` mounts in
+# docker-compose.yml as well. Golden sets are not in that folder: they live in goldens/<id>/ here.
 PRODUCTS_DIR = "products"
 
 # What you changed for this run. Stored on the run file and shown in the history table, so a score
@@ -352,7 +353,7 @@ def build_headers(args: argparse.Namespace) -> Dict[str, str]:
 
 async def run(args: argparse.Namespace) -> int:
     headers = build_headers(args)
-    products = load_products(Path(args.products_dir), args.products, args.cases)
+    products = load_products(Path(args.products_dir), HERE / "goldens", args.products, args.cases)
     all_ids = [p.id for p in products]
     wait_for_server(args.mcp_url, headers=headers)
     if headers:

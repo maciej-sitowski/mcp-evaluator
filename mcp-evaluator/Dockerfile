@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # `docker compose run --rm`). Bake it into the image instead.
 RUN python -m copilot download-runtime
 
-# docker-compose bind-mounts ./evals over /app so you can edit goldens/metrics without rebuilding.
+# docker-compose bind-mounts ./mcp-evaluator over /app so you can edit goldens/metrics without rebuilding.
 COPY . .
 
 ENTRYPOINT ["python", "run_evals.py"]
