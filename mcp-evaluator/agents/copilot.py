@@ -216,16 +216,17 @@ async def _run_agent_async(
         client = _client(token, home, cwd)
         try:
             await asyncio.wait_for(client.start(), START_TIMEOUT_S)
+            server_name = "docs"
             names = list(tools) if tools else ["*"]
             mcp = {"type": "http", "url": mcp_url, "tools": names}
             if headers:
                 mcp["headers"] = dict(headers)
             allowed = ToolSet()
             for name in names:
-                allowed.add_mcp(name)
+                allowed.add_mcp("%s-%s" % (server_name, name))
             async with await client.create_session(
                 **_session_options(model, cwd),
-                mcp_servers={"docs": mcp},
+                mcp_servers={server_name: mcp},
                 available_tools=allowed,  # no shell / file access, only the configured MCP tools
             ) as session:
                 session.on(on_event)

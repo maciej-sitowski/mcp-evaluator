@@ -18,7 +18,7 @@ No DeepEval / Confident AI account is involved.
 #   command-line flag  >  environment variable (handy for a one-off run)  >  the value below.
 
 # Who plays the support assistant: "cursor" or "copilot" (providers live in agents/__init__.py).
-AGENT_PROVIDER = "cursor"
+AGENT_PROVIDER = "copilot"
 # Who grades it. None = the same provider as the agent; set e.g. "cursor" to keep one fixed judge.
 JUDGE_PROVIDER = None
 # Models. None = the provider's default (cursor: composer-2.5, copilot: auto). Model ids differ per
@@ -37,7 +37,7 @@ PRODUCTS_DIR = "products"
 # direct check calls the first one for every product, and the agent is given only these.
 # The search metrics still expect a payload shaped like search_docs (a `results` list of doc hits).
 # Override for one run with --tool name (repeatable) or TOOLS=name1,name2.
-TOOLS = ["search_docs"]
+TOOLS = ["get_search_results"]
 
 # What you changed for this run. Stored on the run file and shown in the history table, so a score
 # change can be matched to the change that produced it. Keys and values are yours; leave the dict
